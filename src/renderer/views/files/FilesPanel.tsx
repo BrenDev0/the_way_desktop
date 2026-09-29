@@ -1,66 +1,74 @@
 import { useCallback, useState } from "react";
 import type { ProjectRef } from "../../../core/tools/ports";
 import { LocalFilesTab } from "./LocalFilesTab";
-import { ProjectFilesTab } from "./ProjectFilesTab";
+import { RemoteFilesTab, type RemoteFocus } from "./RemoteFilesTab";
 import "./files.css";
 
-export type FilesTab = "local" | "project";
+export type FilesTab = "local" | "remote";
 
 interface Props {
   folder: string | null;
   projects: ProjectRef[];
-  project: ProjectRef | null;
   tab: FilesTab;
   /** Bumped by the workbench when an agent turn ends: it may have written to the folder. */
   localRefresh: number;
-  /** Bumped when an agent turn ends: it may have added files to the open project on the server. */
+  /** Bumped when an agent turn ends: it may have added files to projects on the server. */
   serverRefresh: number;
+  /** A project folder to show in the remote tree (a task's delivery). */
+  focus: RemoteFocus | null;
   onTab(tab: FilesTab): void;
-  /** A folder in the open project to show (a task's delivery), e.g. "reports". */
-  focusPath?: string | null;
   onChooseFolder(): void;
+  onProjectsChanged(): Promise<void>;
   /** Shown only when the panel can be dismissed (as an overlay in a small window). */
   onClose?(): void;
 }
 
-/** The right-hand panel: the operator's folder first, the project on the server second. */
-export function FilesPanel({ folder, projects, project, tab, localRefresh, serverRefresh, focusPath, onTab, onChooseFolder, onClose }: Props) {
+/** One file tree with a switch: the operator's folder, or their projects on the server. */
+export function FilesPanel({ folder, projects, tab, localRefresh, serverRefresh, focus, onTab, onChooseFolder, onProjectsChanged, onClose }: Props) {
   const [localTarget, setLocalTarget] = useState("");
   const [downloads, setDownloads] = useState(0);
   const [uploads, setUploads] = useState(0);
   const onTargetChange = useCallback((path: string) => setLocalTarget(path), []);
+  const remote = tab === "remote";
 
   return (
     <aside className="files" aria-label="Archivos">
-      <header className="files__tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "local"} className={tab === "local" ? "files__tab files__tab--active" : "files__tab"} onClick={() => onTab("local")}>
-          LOCAL
-        </button>
-        <button type="button" role="tab" aria-selected={tab === "project"} className={tab === "project" ? "files__tab files__tab--active" : "files__tab"} onClick={() => onTab("project")}>
-          {project ? `PROYECTO · ${project.name}` : "PROYECTO"}
+      <header className="files__switchbar">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={remote}
+          aria-label={remote ? "Mostrando el servidor. Cambiar a este equipo" : "Mostrando este equipo. Cambiar al servidor"}
+          className="files__switch"
+          onClick={() => onTab(remote ? "local" : "remote")}
+        >
+          <span className={remote ? "files__side" : "files__side files__side--on"}>LOCAL</span>
+          <span className="files__swap" aria-hidden="true">⇄</span>
+          <span className={remote ? "files__side files__side--on" : "files__side"}>REMOTO</span>
         </button>
         {onClose && <button type="button" className="files__close" onClick={onClose} aria-label="Ocultar archivos" title="Ocultar archivos">×</button>}
       </header>
 
-      {/* Both stay mounted so switching tabs keeps each tree as it was left. */}
-      <div className="files__pane" hidden={tab !== "local"}>
+      {/* Both stay mounted so switching keeps each tree as it was left. */}
+      <div className="files__pane" hidden={remote}>
         <LocalFilesTab
           folder={folder}
           projects={projects}
-          defaultProject={project}
+          defaultProject={focus ? projects.find((p) => p.name === focus.project) ?? null : null}
           refreshKey={localRefresh + downloads}
           onChooseFolder={onChooseFolder}
           onTargetChange={onTargetChange}
           onUploaded={() => setUploads((n) => n + 1)}
         />
       </div>
-      <div className="files__pane" hidden={tab !== "project"}>
-        <ProjectFilesTab
-          project={project}
+      <div className="files__pane" hidden={!remote}>
+        <RemoteFilesTab
+          projects={projects}
           folder={folder}
           localTarget={localTarget}
           refreshKey={uploads + serverRefresh}
-          focusPath={focusPath ?? null}
+          focus={focus}
+          onProjectsChanged={onProjectsChanged}
           onDownloaded={() => setDownloads((n) => n + 1)}
         />
       </div>

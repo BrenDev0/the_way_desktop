@@ -1,10 +1,13 @@
 /* The files panel beside the chat. Built from theme.css tokens, like workbench.css. */
 
 .files { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border-dim); background: #090f15; }
-.files__tabs { display: flex; align-items: stretch; flex: none; border-bottom: 1px solid var(--border-dim); }
-.files__tab { min-width: 0; padding: 13px 14px 11px; overflow: hidden; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-overflow: ellipsis; white-space: nowrap; }
-.files__tab:hover { color: var(--text-bright); }
-.files__tab--active { border-bottom-color: var(--magenta); color: var(--magenta); text-shadow: var(--glow-magenta); }
+/* One tree, two sides: LOCAL (this computer) and REMOTO (the user's projects on the server). */
+.files__switchbar { display: flex; align-items: stretch; flex: none; min-height: 43px; border-bottom: 1px solid var(--border-dim); }
+.files__switch { display: flex; flex: 1; align-items: center; justify-content: center; gap: 12px; padding: 0 12px; border: 0; background: transparent; font: inherit; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.files__switch:hover .files__side:not(.files__side--on) { color: var(--text-bright); }
+.files__side { padding: 4px 8px; border-bottom: 2px solid transparent; color: var(--muted); transition: color .15s, border-color .15s; }
+.files__side--on { border-bottom-color: var(--magenta); color: var(--magenta); text-shadow: var(--glow-magenta); }
+.files__swap { color: var(--accent); font-size: 14px; text-shadow: var(--glow); }
 .files__close { margin-left: auto; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 18px; }
 .files__close:hover { color: var(--text-bright); }
 .files__pane { display: flex; flex: 1; flex-direction: column; min-height: 0; }
@@ -35,6 +38,8 @@
 .tree__row--selected, .tree__row--selected:hover { border-left-color: var(--accent); background: rgba(0, 255, 0, 0.07); color: var(--accent); }
 .tree__row--drop { background: rgba(255, 0, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 0, 255, 0.45); }
 .tree__row--editing { cursor: default; }
+.tree__row--project .tree__name { color: var(--text-bright); font-weight: 700; }
+.tree__loading { margin: 0; padding: 6px 12px 6px 38px; }
 .tree__icon { flex: none; width: 12px; color: var(--muted); font-size: 11px; text-align: center; }
 .tree__row--selected .tree__icon { color: var(--accent); }
 .tree__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,7 +1,5 @@
 /* The signed-in views. Built from the tokens in theme.css and the card patterns in styles.css. */
 
-.sidebar__nav-button { width: 100%; border: 0; background: transparent; font: inherit; text-align: left; }
-.sidebar__nav-button:hover { color: var(--text-bright); }
 
 .ghost-button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
 .ghost-button:hover { border-color: var(--magenta); color: var(--text-bright); }
@@ -15,15 +13,6 @@
 
 .workbench__files { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--border-dim); background: #090f15; }
 .workbench__files > .files { flex: 1; border-left: 0; }
-.workbench__projects { display: flex; flex: none; flex-direction: column; gap: 6px; max-height: 32%; min-height: 0; padding: 0 10px 10px; border-top: 1px solid var(--border-dim); }
-.workbench__label { flex: none; margin-top: 4px; color: var(--magenta); font-size: 9px; font-weight: 700; letter-spacing: .16em; text-shadow: var(--glow-magenta); }
-.workbench__label--row { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; }
-.workbench__add { width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 3px; background: transparent; color: var(--text); font: inherit; font-size: 14px; line-height: 1; }
-.workbench__add:hover { border-color: var(--accent); color: var(--accent); }
-.workbench__list { flex: 1; min-height: 0; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
-.workbench__none { padding: 6px 10px; color: var(--muted); font-size: 11px; }
-.workbench__project-input { width: 100%; margin-bottom: 4px; padding: 7px 9px; }
-.workbench__error { flex: none; margin: 0; color: var(--error); font-size: 11px; line-height: 1.4; }
 
 .chat__toggles { display: flex; gap: 6px; margin-left: auto; flex: none; }
 .chat__toggle { display: none; }
@@ -42,13 +31,6 @@
   .workbench > .workbench__files { position: absolute; top: 0; left: 0; bottom: 0; z-index: 20; width: min(300px, 70%); box-shadow: 18px 0 40px rgba(0, 0, 0, 0.55); }
   .workbench:not(.workbench--files) > .workbench__files { display: none; }
 }
-.thread { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); text-align: left; }
-.thread:hover { border-color: var(--border-dim); }
-.thread--active { border-color: rgba(0, 255, 0, 0.25); background: rgba(0, 255, 0, 0.05); }
-.thread__title { overflow: hidden; color: var(--text-bright); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.thread__status { color: var(--muted); font-size: 9px; letter-spacing: .1em; }
-.thread__status--running, .thread__status--awaiting_client { color: var(--accent); }
-.thread__status--failed { color: var(--error); }
 
 .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat__bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-dim); }

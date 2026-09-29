@@ -28,6 +28,13 @@ describe("ProjectTree", () => {
     expect(tree.folderPath("c")).toBe("entregas/2026");
     expect(tree.children(null)[2].path).toBe("brief.md");
   });
+
+  it("finds a delivered folder by path and the folders it sits inside", () => {
+    expect(tree.findFolder("Entregas/2026/")).toMatchObject({ kind: "folder", id: "c", path: "entregas/2026" });
+    expect(tree.findFolder("nope")).toBeNull();
+    expect(tree.ancestors("c")).toEqual(["b"]);
+    expect(tree.ancestors("a")).toEqual([]);
+  });
 });
 
 describe("operatorMessage", () => {

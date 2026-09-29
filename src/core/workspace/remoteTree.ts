@@ -38,6 +38,24 @@ export class ProjectTree {
     return path;
   }
 
+  /** The folder at a path, matched case-insensitively ("a/b"), or null. */
+  findFolder(path: string): RemoteEntry | null {
+    const wanted = path.replace(/^\/+|\/+$/g, "").toLowerCase();
+    const folder = this.tree.folders.find((f) => this.folderPath(f.id).toLowerCase() === wanted);
+    return folder ? { kind: "folder", id: folder.id, name: folder.name, path: this.folderPath(folder.id), folder } : null;
+  }
+
+  /** The ids of the folders a folder sits inside, nearest first. */
+  ancestors(folderId: string): string[] {
+    const found: string[] = [];
+    let parent = this.tree.folders.find((f) => f.id === folderId)?.parentId ?? null;
+    while (parent && !found.includes(parent)) {
+      found.push(parent);
+      parent = this.tree.folders.find((f) => f.id === parent)?.parentId ?? null;
+    }
+    return found;
+  }
+
   private join(parentId: string | null, name: string): string {
     const parent = parentId ? this.folderPath(parentId) : "";
     return parent ? `${parent}/${name}` : name;

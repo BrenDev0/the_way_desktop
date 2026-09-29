@@ -9,7 +9,7 @@ const STATUS: Record<Conversation["status"], string> = {
 };
 
 /** The sidebar's chats. Opening or starting one is the workbench's job; this only asks. */
-export function ConversationList({ onShow }: { onShow(): void }) {
+export function ConversationList() {
   const { conversations, activeId } = useConversations();
 
   return (
@@ -19,10 +19,7 @@ export function ConversationList({ onShow }: { onShow(): void }) {
         <button
           type="button"
           className="sidebar__chats-new"
-          onClick={() => {
-            onShow();
-            conversationStore.startNew();
-          }}
+          onClick={() => conversationStore.startNew()}
           aria-label="Nueva conversación"
           title="Nueva conversación"
         >
@@ -35,10 +32,7 @@ export function ConversationList({ onShow }: { onShow(): void }) {
             <button
               type="button"
               className={conversation.id === activeId ? "chat-link chat-link--active" : "chat-link"}
-              onClick={() => {
-                onShow();
-                conversationStore.open(conversation);
-              }}
+              onClick={() => conversationStore.open(conversation)}
               title={conversation.title}
             >
               <span className="chat-link__title">{conversation.title}</span>

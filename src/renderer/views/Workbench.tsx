@@ -6,6 +6,7 @@ import type { ProjectRef } from "../../core/tools/ports";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { ToolCard } from "./chat/ToolCard";
 import { FilesPanel, type FilesTab } from "./files/FilesPanel";
+import type { RemoteFocus } from "./files/RemoteFilesTab";
 import { errorText } from "./files/helpers";
 import { TasksPanel } from "./tasks/TasksPanel";
 import { conversationStore } from "../state/conversations";
@@ -39,12 +40,9 @@ export function Workbench({ user }: Props) {
   const [approvals, setApprovals] = useState<ApprovalPrompt[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectRef[]>([]);
-  const [project, setProject] = useState<ProjectRef | null>(null);
-  const [newProject, setNewProject] = useState<string | null>(null);
-  const [projectError, setProjectError] = useState<string | null>(null);
   const [filesTab, setFilesTab] = useState<FilesTab>("local");
-  // a task's delivered folder, shown in the project tab
-  const [focusPath, setFocusPath] = useState<string | null>(null);
+  // a task's delivered folder, shown in the remote tree
+  const [focus, setFocus] = useState<RemoteFocus | null>(null);
   // in a small window the side columns become overlays, opened from the chat bar
   const [overlay, setOverlay] = useState<"files" | "tasks" | null>(null);
   // bumped when a turn ends: the agent may have written to the folder
@@ -88,7 +86,6 @@ export function Workbench({ user }: Props) {
         await Promise.all([refreshList(), refreshProjects()]);
         if (cancelled) return;
         setOffline(false);
-        setProjectError(null);
         void window.desktop.tools.check().then((check) => setMissingTools(check.missing)).catch(() => {});
         if (activeRef.current) void refreshMessages(activeRef.current).catch(() => {});
       } catch {
@@ -212,43 +209,20 @@ export function Workbench({ user }: Props) {
     }
   }
 
-  function openProject(target: ProjectRef, path: string | null = null) {
-    setProject(target);
-    setFocusPath(path);
-    setFilesTab("project");
-    setOverlay((current) => (current === "tasks" ? "files" : current));
-  }
-
-  /** "Ver archivos" on a finished task: its project, at the folder it delivered to. */
+  /** "Ver archivos" on a finished task: the remote tree, at the folder it delivered to. */
   async function openDelivery(name: string, path: string | null) {
-    const find = (list: ProjectRef[]) => list.find((item) => item.name.toLowerCase() === name.toLowerCase());
-    let target = find(projects);
-    if (!target) {
-      const fresh = await window.desktop.projects.list().catch(() => [] as ProjectRef[]);
-      setProjects(fresh);
-      target = find(fresh);
+    if (!projects.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+      setProjects(await window.desktop.projects.list().catch(() => projects));
     }
-    if (target) openProject(target, path);
+    setFocus({ project: name, path });
+    setFilesTab("remote");
+    setOverlay((current) => (current === "tasks" ? "files" : current));
   }
 
   function openConversationById(id: string) {
     const found = conversations.find((conversation) => conversation.id === id);
     if (found) void open(found);
     setOverlay(null);
-  }
-
-  async function createProject() {
-    const name = newProject?.trim();
-    setNewProject(null);
-    if (!name) return;
-    setProjectError(null);
-    try {
-      const created = await window.desktop.projects.create(name);
-      await refreshProjects();
-      openProject(created);
-    } catch (reason) {
-      setProjectError(errorText(reason));
-    }
   }
 
   async function chooseFolder() {
@@ -277,53 +251,15 @@ export function Workbench({ user }: Props) {
         <FilesPanel
           folder={folder}
           projects={projects}
-          project={project}
           tab={filesTab}
           localRefresh={localRefresh}
           serverRefresh={localRefresh}
-          focusPath={focusPath}
+          focus={focus}
           onTab={setFilesTab}
           onChooseFolder={() => void chooseFolder()}
+          onProjectsChanged={refreshProjects}
           onClose={overlay === "files" ? () => setOverlay(null) : undefined}
         />
-        <section className="workbench__projects" aria-label="Proyectos">
-          <div className="workbench__label workbench__label--row">
-            <span>PROYECTOS</span>
-            <button type="button" className="workbench__add" onClick={() => setNewProject("")} aria-label="Nuevo proyecto" title="Nuevo proyecto">+</button>
-          </div>
-          <ul className="workbench__list">
-            {newProject !== null && (
-              <li>
-                <input
-                  className="tree__input workbench__project-input"
-                  autoFocus
-                  aria-label="Nombre del proyecto"
-                  placeholder="Nombre del proyecto"
-                  value={newProject}
-                  onChange={(event) => setNewProject(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void createProject();
-                    if (event.key === "Escape") setNewProject(null);
-                  }}
-                  onBlur={() => setNewProject(null)}
-                />
-              </li>
-            )}
-            {projects.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className={item.id === project?.id && filesTab === "project" ? "thread thread--active" : "thread"}
-                  onClick={() => openProject(item)}
-                >
-                  <span className="thread__title">▣ {item.name}</span>
-                </button>
-              </li>
-            ))}
-            {!projects.length && newProject === null && <li className="workbench__none">Sin proyectos todavía.</li>}
-          </ul>
-          {projectError && <p className="workbench__error" role="alert">{projectError}</p>}
-        </section>
       </div>
 
       <section className="chat" aria-label="Conversación">

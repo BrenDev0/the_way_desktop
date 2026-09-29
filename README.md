@@ -30,7 +30,7 @@ The agent runs on the server. When it needs this machine, the conversation pause
 
 ## Layout and live activity
 
-The sidebar holds Inicio, Herramientas and the conversation list (`src/renderer/state/conversations.ts` shares it with the workbench). The workbench has three columns: files on the left (Local and Proyecto trees, the projects list below), the chat in the middle, and the tasks on the right. Below 1200 px wide the tasks column becomes an overlay, and below 1000 px the files column does too; both open from the chat bar.
+Signed out, the window is the sign-in (with the server address when the build does not fix one); signed in, it opens straight into the chat. The sidebar holds the conversation list (`src/renderer/state/conversations.ts` shares it with the workbench) and the account. The workbench has three columns: one file tree on the left with a LOCAL ⇄ REMOTO switch (remote shows every project at the top level, their folders below), the chat in the middle, and the tasks on the right. Below 1200 px wide the tasks column becomes an overlay, and below 1000 px the files column does too; both open from the chat bar.
 
 The chat follows the conversation's event stream while a turn runs: reply text as it is written, messages and tool calls as they land. Background tasks keep publishing after the turn ends, so `src/core/tasks/taskMonitor.ts` keeps a conversation's stream open while it has a running task. It collects each task's tool calls (steps inside another tool nest under it), reconnects with `Last-Event-ID`, re-reads `GET /background-tasks` as a fallback, and raises a system notification when a task ends while the window is not focused.
 
@@ -40,7 +40,7 @@ Beside the chat, the operator manages their work locally first and uploads to a 
 
 - **Local**: the open folder as a tree. The operator can create folders, rename (F2), drag entries to move them, delete (with confirmation) and show an entry in Explorer. Operations go through `src/core/workspace/localFiles.ts` over the same fenced `NodeFileSystem` the agent's file tools use. Names follow the server's project-name rules so anything made locally can be uploaded. A rename or move never replaces an existing entry.
 - **Subir a proyecto**: uploads the selected file or folder, or the whole folder, with `uploadToProject` in `src/core/tools/transfer.ts`, the same code as the agent's `UploadToProject`. Files already in the project are skipped, never replaced.
-- **Proyecto**: the project picked in the left rail, from the server's tree. The operator can download an entry into the folder selected in the Local tab (the download stops rather than replace a local file), or delete it from the project.
+- **Remoto**: every project on the server as one tree, projects at the top (+ PROYECTO creates one). The operator can download an entry into the folder selected on the Local side (the download stops rather than replace a local file), or delete it from the project.
 
 Failures reach the window as the operator's message (`src/core/workspace/messages.ts`), not the agent's English.
 

@@ -30,7 +30,7 @@ export function SignIn({ onSignedIn }: Props) {
 
   return (
     <section className="connection-card signin-card" aria-labelledby="signin-title">
-      <div className="card-heading"><span>02 / ACCESO</span><span className="card-heading__accent">● SESIÓN CIFRADA</span></div>
+      <div className="card-heading"><span>ACCESO</span><span className="card-heading__accent">● SESIÓN CIFRADA</span></div>
       <h2 id="signin-title">Inicia sesión</h2>
       <p className="connection-card__copy">Usa la cuenta de tu organización. La sesión se guarda cifrada en este equipo.</p>
       <form onSubmit={submit}>
