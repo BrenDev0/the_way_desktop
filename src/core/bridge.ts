@@ -7,6 +7,7 @@
 import type { AuthState } from "./auth";
 import type { ChatMessage, Conversation, PendingToolCall, ToolActivity } from "./api";
 import type { ServerConnectionPort } from "./connection";
+import type { TaskView } from "./tasks/taskMonitor";
 import type { ProjectRef, RemoteTree } from "./tools/ports";
 import type { ApprovalDecision } from "./tools/runner";
 import type { DownloadResult, UploadResult } from "./tools/transfer";
@@ -71,6 +72,12 @@ export interface DesktopBridge {
   tools: {
     check(): Promise<ToolCheck>;
   };
+  /** The user's background tasks, with the tool calls seen while the app watched them. */
+  tasks: {
+    /** Reads the list afresh (and starts following running tasks). */
+    list(): Promise<TaskView[]>;
+    onChanged(listener: (tasks: TaskView[]) => void): Unsubscribe;
+  };
   /** The open folder, for the files panel. Paths are relative to it, "/"-separated; "" is the folder itself. */
   files: {
     list(folder: string): Promise<LocalEntry[]>;
@@ -115,6 +122,8 @@ export const CHANNELS = {
   approvalsRequest: "approvals:request",
   approvalsRespond: "approvals:respond",
   toolsCheck: "tools:check",
+  tasksList: "tasks:list",
+  tasksChanged: "tasks:changed",
   filesList: "files:list",
   filesCreateFolder: "files:create-folder",
   filesRename: "files:rename",

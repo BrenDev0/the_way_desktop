@@ -3,6 +3,7 @@ import type { AuthService } from "../core/auth";
 import { CHANNELS, type ToolCheck } from "../core/bridge";
 import type { ServerApiPort } from "../core/api";
 import type { TurnService } from "../core/conversations/turnService";
+import type { TaskMonitor } from "../core/tasks/taskMonitor";
 import type { ToolRunner } from "../core/tools/runner";
 import { downloadFromProject, uploadToProject } from "../core/tools/transfer";
 import type { LocalFiles } from "../core/workspace/localFiles";
@@ -15,6 +16,7 @@ import type { WorkspaceStore } from "./workspaceStore";
 export interface AppServices {
   auth: AuthService;
   turns: TurnService;
+  tasks: TaskMonitor;
   runner: ToolRunner;
   approvals: WindowApprovals;
   workspace: WorkspaceStore;
@@ -69,7 +71,12 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
   handle(CHANNELS.authLogin, (email, password) =>
     services.auth.login(requireText(email, "email"), requireText(password, "password"), services.deviceName),
   );
-  handle(CHANNELS.authLogout, () => services.auth.logout());
+  handle(CHANNELS.authLogout, () => {
+    services.tasks.stop();
+    return services.auth.logout();
+  });
+
+  handle(CHANNELS.tasksList, () => services.tasks.refresh());
 
   handle(CHANNELS.workspaceCurrent, () => services.workspace.current());
   handle(CHANNELS.workspaceChoose, async () => {

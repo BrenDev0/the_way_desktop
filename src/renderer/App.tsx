@@ -4,6 +4,8 @@ import type { ConnectionResult } from "../core/connection";
 import { ConnectionService } from "../core/connectionService";
 import { ElectronConnectionAdapter } from "./infrastructure/ElectronConnectionAdapter";
 import { Logo } from "./Logo";
+import { conversationStore } from "./state/conversations";
+import { ConversationList } from "./views/ConversationList";
 import { SignIn } from "./views/SignIn";
 import { Workbench } from "./views/Workbench";
 
@@ -61,6 +63,7 @@ export function App() {
 
   // A token the server stopped accepting (revoked, expired) lands back on the sign-in.
   useEffect(() => window.desktop.auth.onSignedOut(() => {
+    conversationStore.clear();
     setUser(null);
     setSection("home");
   }), []);
@@ -72,6 +75,7 @@ export function App() {
 
   async function signOut() {
     await window.desktop.auth.logout().catch(() => {});
+    conversationStore.clear();
     setUser(null);
     setSection("home");
   }
@@ -105,12 +109,17 @@ export function App() {
         </div>
         <nav className="sidebar__nav" aria-label="Navegación">
           <button type="button" className={`sidebar__nav-item sidebar__nav-button${section === "home" ? " sidebar__nav-item--active" : ""}`} onClick={() => setSection("home")}><span>⌁</span> Inicio</button>
-          {user
-            ? <button type="button" className={`sidebar__nav-item sidebar__nav-button${section === "conversations" ? " sidebar__nav-item--active" : ""}`} onClick={() => setSection("conversations")}><span>◇</span> Conversaciones</button>
-            : <span className="sidebar__nav-item sidebar__nav-item--disabled"><span>◇</span> Conversaciones <small>INICIA SESIÓN</small></span>}
           <span className="sidebar__nav-item sidebar__nav-item--disabled"><span>▧</span> Herramientas <small>PRONTO</small></span>
+          {!user && <span className="sidebar__nav-item sidebar__nav-item--disabled"><span>◇</span> Conversaciones <small>INICIA SESIÓN</small></span>}
         </nav>
+        {user && <ConversationList onShow={() => setSection("conversations")} />}
         <div className="sidebar__bottom">
+          {user && (
+            <div className="sidebar__account">
+              <span className="selectable" title={user.email}>{user.email}</span>
+              <button type="button" className="ghost-button" onClick={() => void signOut()}>SALIR</button>
+            </div>
+          )}
           <div className="sidebar__status">
             <span className={connected ? "dot dot--on" : "dot"} />
             <span>{connected ? "SERVIDOR CONECTADO" : "SERVIDOR SIN CONEXIÓN"}</span>
@@ -125,7 +134,13 @@ export function App() {
           <div className="topbar__right"><span className="topbar__pulse" /> SISTEMA LOCAL</div>
         </header>
 
-        {section === "conversations" && user ? <Workbench user={user} onSignOut={() => void signOut()} /> : (
+        {/* Kept mounted while signed in, so a turn in progress and the open chat survive a visit to Inicio. */}
+        {user && (
+          <div className="workspace__stage" hidden={section !== "conversations"}>
+            <Workbench user={user} />
+          </div>
+        )}
+        {section === "conversations" && user ? null : (
         <div className="workspace__content">
           <div className="hero">
             <p className="eyebrow"><span className="eyebrow__line" /> EL CAMINO COMIENZA AQUÍ</p>

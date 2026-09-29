@@ -49,6 +49,10 @@ const desktop: DesktopBridge = {
   tools: {
     check: () => ipcRenderer.invoke(CHANNELS.toolsCheck) as Promise<ToolCheck>,
   },
+  tasks: {
+    list: () => ipcRenderer.invoke(CHANNELS.tasksList),
+    onChanged: (listener) => listen(CHANNELS.tasksChanged, listener),
+  },
   files: {
     list: (folder) => ipcRenderer.invoke(CHANNELS.filesList, folder),
     createFolder: (parent, name) => ipcRenderer.invoke(CHANNELS.filesCreateFolder, parent, name),

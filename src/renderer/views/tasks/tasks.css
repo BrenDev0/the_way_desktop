@@ -1,0 +1,49 @@
+/* The tasks column. Same tokens and surfaces as the files panel (files.css). */
+
+.tasks { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border-dim); background: #090f15; }
+.tasks__header { display: flex; align-items: center; gap: 10px; flex: none; min-height: 43px; padding: 0 0 0 14px; border-bottom: 1px solid var(--border-dim); }
+.tasks__title { color: var(--magenta); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-shadow: var(--glow-magenta); }
+.tasks__count { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.tasks__header .files__close { margin-left: auto; }
+.tasks__pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: task-pulse 1.4s ease-in-out infinite; }
+@keyframes task-pulse { 50% { opacity: .35; } }
+
+/* The column's one scrolling area. */
+.tasks__list { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; padding: 10px; overflow-y: auto; }
+.tasks__hint { padding: 6px 4px; }
+
+.task { flex: none; border: 1px solid var(--border-dim); border-left: 2px solid var(--muted); border-radius: 4px; background: var(--panel); }
+.task--running { border-left-color: var(--accent); }
+.task--done { border-left-color: rgba(0, 255, 0, 0.45); }
+.task--failed { border-left-color: var(--error); }
+.task__head { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 2px 8px; width: 100%; padding: 9px 10px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; }
+.task__head:hover { background: #ffffff05; }
+.task__state { grid-row: span 2; display: grid; place-items: start center; padding-top: 3px; color: var(--muted); font-size: 11px; }
+.task--done .task__state { color: var(--accent); }
+.task--failed .task__state { color: var(--error); }
+.task__description { overflow: hidden; color: var(--text-bright); font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.task__meta { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.task--running .task__meta { color: var(--accent); }
+.task--failed .task__meta { color: var(--error); }
+
+.task__body { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px 32px; }
+.task__quiet { margin: 0; color: var(--muted); font-size: 11px; }
+.task__steps { margin: 0; padding: 0; list-style: none; }
+.task__steps--nested { margin-left: 8px; padding-left: 8px; border-left: 1px dashed var(--border-dim); }
+.task-step { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 2px 0; font-size: 11px; }
+.task-step__state { flex: none; width: 10px; color: var(--muted); text-align: center; }
+.task-step--running .task-step__state { color: var(--warn); }
+.task-step--done .task-step__state { color: var(--accent); }
+.task-step--failed .task-step__state { color: var(--error); }
+.task-step__label { flex: none; color: var(--text); }
+.task-step--running .task-step__label { color: var(--text-bright); }
+.task-step__about { min-width: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+
+.task__result summary { cursor: pointer; color: var(--magenta); font-size: 9px; font-weight: 700; letter-spacing: .12em; list-style: none; }
+.task__result summary::-webkit-details-marker { display: none; }
+.task__result summary::before { content: "▸ "; }
+.task__result[open] summary::before { content: "▾ "; }
+.task__result pre { max-height: 220px; margin: 6px 0 0; padding: 8px; overflow: auto; border: 1px solid var(--border-dim); border-radius: 3px; background: var(--field); color: var(--text); font: inherit; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.task__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.task__actions .ghost-button { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 5px 8px; font-size: 9px; }
+.task__where { overflow: hidden; color: var(--muted); letter-spacing: 0; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }

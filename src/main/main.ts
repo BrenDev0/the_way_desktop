@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, Notification } from "electron";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { AuthService } from "../core/auth";
 import { CHANNELS } from "../core/bridge";
 import { ConnectionService } from "../core/connectionService";
 import { TurnService } from "../core/conversations/turnService";
+import { TaskMonitor, type TaskView } from "../core/tasks/taskMonitor";
 import { desktopTools } from "../core/tools";
 import { ToolRunner } from "../core/tools/runner";
 import { LocalFiles } from "../core/workspace/localFiles";
@@ -74,11 +75,32 @@ function createWindow() {
   mainWindow.on("closed", () => { mainWindow = null; });
 }
 
+/** A task that ends while the operator is looking elsewhere gets a system notification. */
+function notifyFinished(task: TaskView) {
+  if (mainWindow?.isFocused() || !Notification.isSupported()) return;
+  const where = task.deliverProject ? ` · ${task.deliverProject}${task.deliverPath ? `/${task.deliverPath}` : ""}` : "";
+  const notice = new Notification({
+    title: task.status === "done" ? "Tarea lista" : "La tarea falló",
+    body: `${task.description}${where}`,
+  });
+  notice.on("click", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  });
+  notice.show();
+}
+
 /** The signed-in half of the app: the server API, the conversation loop and the tools. */
 function createServices(connection: ServerConnectionAdapter): AppServices {
   const userData = app.getPath("userData");
   const tokens = new TokenStore(userData);
-  const api = new ApiClient(connection, tokens, () => mainWindow?.webContents.send(CHANNELS.authSignedOut));
+  // the monitor is made below; a revoked token must stop its streams too
+  let monitor: TaskMonitor | undefined;
+  const api = new ApiClient(connection, tokens, () => {
+    monitor?.stop();
+    mainWindow?.webContents.send(CHANNELS.authSignedOut);
+  });
   const workspace = new WorkspaceStore(userData);
   const approvals = new WindowApprovals(() => mainWindow);
 
@@ -91,16 +113,28 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     approvals,
   );
   const send = (channel: string, payload: unknown) => mainWindow?.webContents.send(channel, payload);
-  const turns = new TurnService(api, new ConversationEvents(api), runner, {
+  const events = new ConversationEvents(api);
+  const tasks = new TaskMonitor(api, events, {
+    changed: (list) => send(CHANNELS.tasksChanged, list),
+    finished: notifyFinished,
+  });
+  monitor = tasks;
+  const turns = new TurnService(api, events, runner, {
     update: (conversation) => send(CHANNELS.conversationsUpdate, conversation),
     text: (conversationId, text) => send(CHANNELS.conversationsText, { conversationId, text }),
     message: (conversationId, message) => send(CHANNELS.conversationsActivity, { conversationId, message }),
-    activity: (conversationId, tool) => send(CHANNELS.conversationsActivity, { conversationId, tool }),
+    activity: (conversationId, tool) => {
+      tasks.activity(tool);
+      send(CHANNELS.conversationsActivity, { conversationId, tool });
+    },
+    // a task outlives the turn that started it: the monitor carries on from this event
+    task: (conversationId, task, eventId) => tasks.track(conversationId, task, eventId),
   });
 
   return {
     auth: new AuthService(api, tokens),
     turns,
+    tasks,
     runner,
     approvals,
     workspace,

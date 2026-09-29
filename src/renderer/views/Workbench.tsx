@@ -7,11 +7,12 @@ import { ApprovalDialog } from "./ApprovalDialog";
 import { ToolCard } from "./chat/ToolCard";
 import { FilesPanel, type FilesTab } from "./files/FilesPanel";
 import { errorText } from "./files/helpers";
+import { TasksPanel } from "./tasks/TasksPanel";
+import { conversationStore } from "../state/conversations";
 import "./workbench.css";
 
 interface Props {
   user: DesktopUser;
-  onSignOut(): void;
 }
 
 const STATUS: Record<Conversation["status"], string> = {
@@ -21,8 +22,12 @@ const STATUS: Record<Conversation["status"], string> = {
   failed: "EL ÚLTIMO TURNO FALLÓ",
 };
 
-/** Conversations, the chat, the working folder, and the approvals the agent asks for. */
-export function Workbench({ user, onSignOut }: Props) {
+/**
+ * The signed-in workspace: files on the left (the open folder and the user's projects), the
+ * chat in the middle, background tasks on the right. The conversation list itself lives in
+ * the app's sidebar, which reads it from conversationStore and asks this to open one.
+ */
+export function Workbench({ user }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -37,8 +42,11 @@ export function Workbench({ user, onSignOut }: Props) {
   const [project, setProject] = useState<ProjectRef | null>(null);
   const [newProject, setNewProject] = useState<string | null>(null);
   const [projectError, setProjectError] = useState<string | null>(null);
-  const [filesOpen, setFilesOpen] = useState(true);
   const [filesTab, setFilesTab] = useState<FilesTab>("local");
+  // a task's delivered folder, shown in the project tab
+  const [focusPath, setFocusPath] = useState<string | null>(null);
+  // in a small window the side columns become overlays, opened from the chat bar
+  const [overlay, setOverlay] = useState<"files" | "tasks" | null>(null);
   // bumped when a turn ends: the agent may have written to the folder
   const [localRefresh, setLocalRefresh] = useState(0);
   // true while the server cannot be reached (it restarts on every backend change in development)
@@ -60,6 +68,10 @@ export function Workbench({ user, onSignOut }: Props) {
   const refreshMessages = useCallback(async (id: string) => {
     setMessages(await window.desktop.conversations.messages(id));
   }, []);
+
+  useEffect(() => {
+    conversationStore.publish({ conversations, activeId });
+  }, [conversations, activeId]);
 
   /** After a turn: the agent may have written local files or created projects and files on the server. */
   const afterTurn = useCallback(() => {
@@ -154,6 +166,14 @@ export function Workbench({ user, onSignOut }: Props) {
     }
   }
 
+  // The sidebar's list asks through the store; the latest open/startNew answer it.
+  const actions = useRef({ open, startNew });
+  actions.current = { open, startNew };
+  useEffect(() => conversationStore.register({
+    open: (conversation) => void actions.current.open(conversation),
+    startNew: () => void actions.current.startNew(),
+  }), []);
+
   async function startNew() {
     const created = await window.desktop.conversations.create("Nueva conversación");
     await refreshList();
@@ -192,10 +212,29 @@ export function Workbench({ user, onSignOut }: Props) {
     }
   }
 
-  function openProject(target: ProjectRef) {
+  function openProject(target: ProjectRef, path: string | null = null) {
     setProject(target);
+    setFocusPath(path);
     setFilesTab("project");
-    setFilesOpen(true);
+    setOverlay((current) => (current === "tasks" ? "files" : current));
+  }
+
+  /** "Ver archivos" on a finished task: its project, at the folder it delivered to. */
+  async function openDelivery(name: string, path: string | null) {
+    const find = (list: ProjectRef[]) => list.find((item) => item.name.toLowerCase() === name.toLowerCase());
+    let target = find(projects);
+    if (!target) {
+      const fresh = await window.desktop.projects.list().catch(() => [] as ProjectRef[]);
+      setProjects(fresh);
+      target = find(fresh);
+    }
+    if (target) openProject(target, path);
+  }
+
+  function openConversationById(id: string) {
+    const found = conversations.find((conversation) => conversation.id === id);
+    if (found) void open(found);
+    setOverlay(null);
   }
 
   async function createProject() {
@@ -233,67 +272,59 @@ export function Workbench({ user, onSignOut }: Props) {
   const pendingNames = status?.pendingToolCalls.map((call) => call.name) ?? [];
 
   return (
-    <div className={filesOpen ? "workbench workbench--files" : "workbench"}>
-      <aside className="workbench__threads">
-        <button type="button" className="connect-button workbench__new" onClick={() => void startNew()}>
-          NUEVA <span aria-hidden="true">+</span>
-        </button>
-        <span className="workbench__label">CONVERSACIONES</span>
-        <ul className="workbench__list">
-          {conversations.map((conversation) => (
-            <li key={conversation.id}>
-              <button
-                type="button"
-                className={conversation.id === activeId ? "thread thread--active" : "thread"}
-                onClick={() => void open(conversation)}
-              >
-                <span className="thread__title">{conversation.title}</span>
-                <span className={`thread__status thread__status--${conversation.status}`}>{STATUS[conversation.status]}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div className="workbench__label workbench__label--row">
-          <span>PROYECTOS</span>
-          <button type="button" className="workbench__add" onClick={() => setNewProject("")} aria-label="Nuevo proyecto" title="Nuevo proyecto">+</button>
-        </div>
-        <ul className="workbench__list workbench__list--projects">
-          {newProject !== null && (
-            <li>
-              <input
-                className="tree__input workbench__project-input"
-                autoFocus
-                aria-label="Nombre del proyecto"
-                placeholder="Nombre del proyecto"
-                value={newProject}
-                onChange={(event) => setNewProject(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void createProject();
-                  if (event.key === "Escape") setNewProject(null);
-                }}
-                onBlur={() => setNewProject(null)}
-              />
-            </li>
-          )}
-          {projects.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                className={item.id === project?.id && filesOpen && filesTab === "project" ? "thread thread--active" : "thread"}
-                onClick={() => openProject(item)}
-              >
-                <span className="thread__title">▣ {item.name}</span>
-              </button>
-            </li>
-          ))}
-          {!projects.length && newProject === null && <li className="workbench__none">Sin proyectos todavía.</li>}
-        </ul>
-        {projectError && <p className="workbench__error" role="alert">{projectError}</p>}
-        <div className="workbench__account">
-          <span className="selectable">{user.email}</span>
-          <button type="button" className="ghost-button" onClick={onSignOut}>SALIR</button>
-        </div>
-      </aside>
+    <div className={overlay ? `workbench workbench--${overlay}` : "workbench"}>
+      <div className="workbench__files">
+        <FilesPanel
+          folder={folder}
+          projects={projects}
+          project={project}
+          tab={filesTab}
+          localRefresh={localRefresh}
+          serverRefresh={localRefresh}
+          focusPath={focusPath}
+          onTab={setFilesTab}
+          onChooseFolder={() => void chooseFolder()}
+          onClose={overlay === "files" ? () => setOverlay(null) : undefined}
+        />
+        <section className="workbench__projects" aria-label="Proyectos">
+          <div className="workbench__label workbench__label--row">
+            <span>PROYECTOS</span>
+            <button type="button" className="workbench__add" onClick={() => setNewProject("")} aria-label="Nuevo proyecto" title="Nuevo proyecto">+</button>
+          </div>
+          <ul className="workbench__list">
+            {newProject !== null && (
+              <li>
+                <input
+                  className="tree__input workbench__project-input"
+                  autoFocus
+                  aria-label="Nombre del proyecto"
+                  placeholder="Nombre del proyecto"
+                  value={newProject}
+                  onChange={(event) => setNewProject(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void createProject();
+                    if (event.key === "Escape") setNewProject(null);
+                  }}
+                  onBlur={() => setNewProject(null)}
+                />
+              </li>
+            )}
+            {projects.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={item.id === project?.id && filesTab === "project" ? "thread thread--active" : "thread"}
+                  onClick={() => openProject(item)}
+                >
+                  <span className="thread__title">▣ {item.name}</span>
+                </button>
+              </li>
+            ))}
+            {!projects.length && newProject === null && <li className="workbench__none">Sin proyectos todavía.</li>}
+          </ul>
+          {projectError && <p className="workbench__error" role="alert">{projectError}</p>}
+        </section>
+      </div>
 
       <section className="chat" aria-label="Conversación">
         <header className="chat__bar">
@@ -303,9 +334,10 @@ export function Workbench({ user, onSignOut }: Props) {
           <span className="chat__folder selectable" title={folder ?? undefined}>
             {folder ?? "Sin carpeta: el agente no podrá leer ni escribir archivos de este equipo."}
           </span>
-          {!filesOpen && (
-            <button type="button" className="ghost-button chat__files-toggle" onClick={() => setFilesOpen(true)}>ARCHIVOS ◧</button>
-          )}
+          <span className="chat__toggles">
+            <button type="button" className="ghost-button chat__toggle chat__toggle--files" onClick={() => setOverlay((o) => (o === "files" ? null : "files"))} aria-pressed={overlay === "files"}>◧ ARCHIVOS</button>
+            <button type="button" className="ghost-button chat__toggle chat__toggle--tasks" onClick={() => setOverlay((o) => (o === "tasks" ? null : "tasks"))} aria-pressed={overlay === "tasks"}>TAREAS ◨</button>
+          </span>
         </header>
 
         {offline && (
@@ -355,7 +387,7 @@ export function Workbench({ user, onSignOut }: Props) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Escribe un mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
+            placeholder="Escribe un mensaje…  (Shift+Enter: nueva línea)"
             rows={2}
             disabled={sending}
           />
@@ -365,19 +397,11 @@ export function Workbench({ user, onSignOut }: Props) {
         </form>
       </section>
 
-      {filesOpen && (
-        <FilesPanel
-          folder={folder}
-          projects={projects}
-          project={project}
-          tab={filesTab}
-          localRefresh={localRefresh}
-          serverRefresh={localRefresh}
-          onTab={setFilesTab}
-          onChooseFolder={() => void chooseFolder()}
-          onClose={() => setFilesOpen(false)}
-        />
-      )}
+      <TasksPanel
+        onOpenProject={(name, path) => void openDelivery(name, path)}
+        onOpenConversation={openConversationById}
+        onClose={overlay === "tasks" ? () => setOverlay(null) : undefined}
+      />
 
       {approvals[0] && <ApprovalDialog prompt={approvals[0]} onAnswer={(ok, feedback) => void answer(ok, feedback)} />}
     </div>

@@ -10,11 +10,13 @@ interface Props {
   localTarget: string;
   /** Bumped after an upload into this project. */
   refreshKey: number;
+  /** A folder to open and select once the tree is loaded ("" or null: none). */
+  focusPath: string | null;
   onDownloaded(): void;
 }
 
 /** One project on the server: browse it, bring files down, tidy it up. */
-export function ProjectFilesTab({ project, folder, localTarget, refreshKey, onDownloaded }: Props) {
+export function ProjectFilesTab({ project, folder, localTarget, refreshKey, focusPath, onDownloaded }: Props) {
   const [tree, setTree] = useState<RemoteTree | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<RemoteEntry | null>(null);
@@ -39,6 +41,18 @@ export function ProjectFilesTab({ project, folder, localTarget, refreshKey, onDo
   useEffect(() => {
     if (refreshKey) void load().catch(() => {});
   }, [refreshKey, load]);
+
+  // A delivered folder: open every folder on the way to it and select it.
+  useEffect(() => {
+    if (!view || !tree || !focusPath) return;
+    const wanted = focusPath.replace(/^\/+|\/+$/g, "").toLowerCase();
+    const target = tree.folders.find((f) => view.folderPath(f.id).toLowerCase() === wanted);
+    if (!target) return;
+    const open = new Set<string>();
+    for (let id: string | null = target.id; id; id = tree.folders.find((f) => f.id === id)?.parentId ?? null) open.add(id);
+    setExpanded(open);
+    setSelected({ kind: "folder", id: target.id, name: target.name, path: view.folderPath(target.id), folder: target });
+  }, [view, tree, focusPath]);
 
   async function act(run: () => Promise<void>) {
     setBusy(true);

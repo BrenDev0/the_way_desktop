@@ -28,6 +28,12 @@ The agent runs on the server. When it needs this machine, the conversation pause
 - `src/main/nodeFileSystem.ts` — the disk, fenced to the folder the user chose (`<userData>/workspace.json`). Every path is resolved against it and its real location, symlinks followed, must stay inside.
 - `src/main/electronBrowser.ts` — the assistant's own visible browser windows, with a persistent profile (`persist:assistant-browser`) so WhatsApp Web stays signed in.
 
+## Layout and live activity
+
+The sidebar holds Inicio, Herramientas and the conversation list (`src/renderer/state/conversations.ts` shares it with the workbench). The workbench has three columns: files on the left (Local and Proyecto trees, the projects list below), the chat in the middle, and the tasks on the right. Below 1200 px wide the tasks column becomes an overlay, and below 1000 px the files column does too; both open from the chat bar.
+
+The chat follows the conversation's event stream while a turn runs: reply text as it is written, messages and tool calls as they land. Background tasks keep publishing after the turn ends, so `src/core/tasks/taskMonitor.ts` keeps a conversation's stream open while it has a running task. It collects each task's tool calls (steps inside another tool nest under it), reconnects with `Last-Event-ID`, re-reads `GET /background-tasks` as a fallback, and raises a system notification when a task ends while the window is not focused.
+
 ## Files panel
 
 Beside the chat, the operator manages their work locally first and uploads to a project on demand.

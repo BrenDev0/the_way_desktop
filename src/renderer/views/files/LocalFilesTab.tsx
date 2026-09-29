@@ -286,8 +286,8 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
     <div className="files__body" onKeyDown={onKeyDown}>
       <div className="files__toolbar" role="toolbar" aria-label="Acciones de archivos">
         <button type="button" className="ghost-button" onClick={startCreate} disabled={busy}>+ CARPETA</button>
-        <button type="button" className="ghost-button" disabled={busy || !selected} onClick={() => selected && beginEdit({ mode: "rename", path: selected.path, value: selected.name })}>RENOMBRAR</button>
-        <button type="button" className="ghost-button ghost-button--danger" disabled={busy || !selected} onClick={() => setConfirmDelete(true)}>ELIMINAR</button>
+        <button type="button" className="ghost-button ghost-button--icon" disabled={busy || !selected} onClick={() => selected && beginEdit({ mode: "rename", path: selected.path, value: selected.name })} title="Renombrar (F2)" aria-label="Renombrar">✎</button>
+        <button type="button" className="ghost-button ghost-button--icon ghost-button--danger" disabled={busy || !selected} onClick={() => setConfirmDelete(true)} title="Eliminar (Supr)" aria-label="Eliminar">✕</button>
         <button type="button" className="ghost-button ghost-button--icon" disabled={busy} onClick={() => void act(() => window.desktop.files.reveal(selected?.path ?? ""))} title="Mostrar en el explorador" aria-label="Mostrar en el explorador">↗</button>
         <button type="button" className="ghost-button ghost-button--icon" disabled={busy} onClick={() => void act(() => reload(expanded))} title="Actualizar" aria-label="Actualizar">↻</button>
       </div>

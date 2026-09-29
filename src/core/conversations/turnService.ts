@@ -4,6 +4,7 @@ import {
   type Conversation,
   type ConversationEventsPort,
   type ServerApiPort,
+  type TaskEvent,
   type ToolActivity,
   type ToolResolution,
 } from "../api";
@@ -17,8 +18,11 @@ export interface TurnEvents {
   text?(conversationId: string, text: string): void;
   /** A message the turn added -- the assistant's, or a tool result (clipped). */
   message?(conversationId: string, message: ChatMessage): void;
-  /** A server-side tool starting or finishing. */
+  /** A server-side tool starting or finishing -- the reply's, or a background task's (taskId set). */
   activity?(conversationId: string, activity: ToolActivity): void;
+  /** A background task this conversation started began or ended. `eventId` is where the
+   *  stream stood, so whoever watches the task after the turn can carry on from there. */
+  task?(conversationId: string, task: TaskEvent, eventId: string | undefined): void;
 }
 
 export interface TurnOptions {
@@ -168,13 +172,23 @@ export class TurnService {
     if (event.type === "text") this.events.text?.(conversationId, (data as { text: string }).text);
     else if (event.type === "message") this.events.message?.(conversationId, data as ChatMessage);
     else if (event.type === "tool.started" || event.type === "tool.finished") {
-      const { id, name, failed } = data as { id: string; name: string; failed?: boolean };
+      const { id, name, failed, args, parentId, taskId } = data as Omit<ToolActivity, "state">;
       this.events.activity?.(conversationId, {
         id,
         name,
         state: event.type === "tool.started" ? "started" : "finished",
         failed,
+        args,
+        parentId,
+        taskId,
       });
+    } else if (event.type === "task.started" || event.type === "task.finished") {
+      const { taskId, description, status } = data as Omit<TaskEvent, "state">;
+      this.events.task?.(
+        conversationId,
+        { taskId, description, status, state: event.type === "task.started" ? "started" : "finished" },
+        event.id,
+      );
     }
     return undefined;
   }

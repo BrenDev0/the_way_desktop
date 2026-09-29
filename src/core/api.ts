@@ -87,4 +87,34 @@ export interface ToolActivity {
   name: string;
   state: "started" | "finished";
   failed?: boolean;
+  /** Sent with tool.started only. */
+  args?: Record<string, unknown>;
+  /** The call this one runs inside (BuildHtmlPage's designer and builder, BuildSkill's writer). */
+  parentId?: string;
+  /** Set when a background task made the call, not the reply. */
+  taskId?: string;
+}
+
+export type TaskStatus = "running" | "done" | "failed";
+
+/** GET /background-tasks and /background-tasks/{id}: a task the user's agent started. */
+export interface BackgroundTask {
+  id: string;
+  conversationId: string | null;
+  description: string;
+  status: TaskStatus;
+  result: string | null;
+  /** Where the finished work is delivered, e.g. project "test_report", path "reports". */
+  deliverProject: string | null;
+  deliverPath: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** task.started / task.finished on the stream of the conversation that started the task. */
+export interface TaskEvent {
+  taskId: string;
+  description: string;
+  state: "started" | "finished";
+  status?: TaskStatus;
 }
