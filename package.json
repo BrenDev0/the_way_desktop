@@ -8,12 +8,17 @@
   "scripts": {
     "dev": "electron-forge start",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "theme:sync": "node scripts/theme.mjs sync",
+    "theme:check": "node scripts/theme.mjs check",
+    "package": "electron-forge package",
     "make": "electron-forge make"
   },
   "config": {
     "forge": "./forge.config.cjs"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
@@ -27,6 +32,7 @@
     "@types/react-dom": "^19.3.0",
     "electron": "^44.4.5",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
   }
 }

@@ -1,0 +1,53 @@
+/* The files panel beside the chat. Built from theme.css tokens, like workbench.css. */
+
+.files { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border-dim); background: #090f15; }
+.files__tabs { display: flex; align-items: stretch; flex: none; border-bottom: 1px solid var(--border-dim); }
+.files__tab { min-width: 0; padding: 13px 14px 11px; overflow: hidden; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-overflow: ellipsis; white-space: nowrap; }
+.files__tab:hover { color: var(--text-bright); }
+.files__tab--active { border-bottom-color: var(--magenta); color: var(--magenta); text-shadow: var(--glow-magenta); }
+.files__close { margin-left: auto; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 18px; }
+.files__close:hover { color: var(--text-bright); }
+.files__pane { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.files__pane[hidden] { display: none; }
+
+.files__body { display: flex; flex: 1; flex-direction: column; gap: 10px; min-height: 0; padding: 12px; }
+.files__toolbar { display: flex; flex-wrap: wrap; gap: 5px; flex: none; }
+.files__toolbar .ghost-button { padding: 6px 8px; font-size: 10px; letter-spacing: .05em; }
+.files__toolbar .ghost-button--icon { min-width: 28px; padding-inline: 6px; }
+.ghost-button:disabled { opacity: .4; cursor: not-allowed; }
+.ghost-button--danger:hover:not(:disabled) { border-color: var(--error); color: var(--error); }
+
+.files__empty { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 16px; padding: 24px; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
+.files__empty p { margin: 0; }
+.files__hint { flex: none; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.files__notice { flex: none; margin: 0; padding: 8px 10px; border-left: 2px solid var(--accent); background: rgba(0, 255, 0, 0.05); color: var(--accent); font-size: 11px; line-height: 1.5; }
+.files__notice--error { border-left-color: var(--error); background: rgba(255, 120, 144, 0.07); color: var(--error); }
+.files__confirm { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid rgba(255, 120, 144, 0.4); border-radius: 4px; background: rgba(255, 120, 144, 0.05); color: var(--text-bright); font-size: 11px; line-height: 1.5; }
+.files__confirm > span { flex-basis: 100%; }
+
+/* The one scrolling area in the panel, like the chat log. */
+.tree { flex: 1; min-height: 0; margin: 0 -12px; padding: 2px 0; overflow-y: auto; border-block: 1px solid var(--border-dim); }
+.tree--drop { background: rgba(255, 0, 255, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 0, 255, 0.35); }
+.tree ul { margin: 0; padding: 0; list-style: none; }
+.tree > .files__hint { padding: 14px; }
+.tree__row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 12px 4px 10px; border: 0; border-left: 2px solid transparent; background: transparent; color: var(--text); font: inherit; font-size: 12px; text-align: left; }
+.tree__row:hover { background: #ffffff06; color: var(--text-bright); }
+.tree__row--selected, .tree__row--selected:hover { border-left-color: var(--accent); background: rgba(0, 255, 0, 0.07); color: var(--accent); }
+.tree__row--drop { background: rgba(255, 0, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 0, 255, 0.45); }
+.tree__row--editing { cursor: default; }
+.tree__icon { flex: none; width: 12px; color: var(--muted); font-size: 11px; text-align: center; }
+.tree__row--selected .tree__icon { color: var(--accent); }
+.tree__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree__meta { flex: none; margin-left: auto; color: var(--muted); font-size: 10px; }
+.tree__input { flex: 1; min-width: 0; padding: 3px 6px; border: 1px solid var(--magenta); border-radius: 3px; outline: none; background: var(--field); color: var(--text-bright); font: inherit; font-size: 12px; user-select: text; caret-color: var(--accent); }
+
+.files__upload-open { flex: none; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 0; padding: 10px 14px; font-size: 11px; }
+/* .connect-button > span is sized for the arrow glyph; this span is a caption. */
+.connect-button > .files__upload-target { max-width: 100%; font-size: 10px; line-height: 1.4; overflow: hidden; color: var(--muted); font-size: 10px; letter-spacing: .04em; text-overflow: ellipsis; text-transform: none; white-space: nowrap; text-shadow: none; }
+.files__upload { display: flex; flex: none; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border-dim); border-top-color: var(--magenta); border-radius: 4px; background: var(--panel); }
+.files__upload-title { overflow: hidden; color: var(--magenta); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-overflow: ellipsis; white-space: nowrap; text-shadow: var(--glow-magenta); }
+.files__upload label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 10px; letter-spacing: .1em; }
+.files__upload select, .files__upload input { min-height: 34px; padding: 6px 10px; border: 1px solid var(--border-dim); border-radius: 4px; outline: none; background: var(--field); color: var(--text-bright); font: inherit; font-size: 12px; letter-spacing: 0; color-scheme: dark; user-select: text; }
+.files__upload select:focus, .files__upload input:focus { border-color: var(--magenta); }
+.files__upload-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.files__upload-actions .connect-button { width: auto; min-height: 36px; min-width: 110px; padding: 6px 14px; font-size: 11px; }

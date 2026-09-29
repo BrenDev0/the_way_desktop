@@ -1,0 +1,55 @@
+/*
+ * THE WAY design tokens, shared by the management panel and the desktop app.
+ * Canonical copy: front_end_the_way/src/app/theme.css. The desktop app keeps a copy in
+ * src/renderer/theme.css; update it with `npm run theme:sync` there (`theme:check` fails on drift).
+ *
+ * Effect levels are chosen with data-effects on <html>:
+ *   (default) full  - the desktop app: strong scanlines and neon glow everywhere.
+ *   calm            - the management panel (and a future desktop "reduce effects" setting):
+ *                     faint scanlines, glow only where --glow-accent is used.
+ */
+:root {
+  /* Brand */
+  --accent: #00ff00;
+  --accent-dim: #00af00;
+  --accent-deep: #005f00;
+  --magenta: #ff00ff;
+  --magenta-dim: #b4009e;
+
+  /* Surfaces */
+  --bg: #060a0e;
+  --panel: #0c1319;
+  --panel-raised: #111d25;
+  --field: #060c12;
+  --border: #385545;
+  --border-dim: #24333e;
+
+  /* Text and status */
+  --text: #b9c9d1;
+  --text-bright: #ecf5f4;
+  --muted: #899ca8;
+  --placeholder: #71818d;
+  --warn: #f2c46d;
+  --error: #ff7890;
+
+  --radius: 7px;
+
+  /* Type. Each app loads the font files and may set --font-mono-face / --font-sans-face. */
+  --font-mono: var(--font-mono-face, "JetBrains Mono"), ui-monospace, "Cascadia Code", Consolas, monospace;
+  --font-sans: var(--font-sans-face, "IBM Plex Sans"), system-ui, "Segoe UI", sans-serif;
+
+  /* Effects: full level */
+  --scanlines: 0.28;
+  --glow: 0 0 6px rgba(0, 255, 0, 0.55);
+  --glow-magenta: 0 0 6px rgba(255, 0, 255, 0.6);
+  /* Emphasis glow for primary actions and active states; kept at every level. */
+  --glow-accent: 0 0 6px rgba(0, 255, 0, 0.55);
+
+  color-scheme: dark;
+}
+
+[data-effects="calm"] {
+  --scanlines: 0.07;
+  --glow: none;
+  --glow-magenta: none;
+}

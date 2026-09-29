@@ -1,31 +1,40 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { DesktopUser } from "../core/api";
 import type { ConnectionResult } from "../core/connection";
 import { ConnectionService } from "../core/connectionService";
 import { ElectronConnectionAdapter } from "./infrastructure/ElectronConnectionAdapter";
 import { Logo } from "./Logo";
+import { SignIn } from "./views/SignIn";
+import { Workbench } from "./views/Workbench";
 
 type ViewStatus = "loading" | "idle" | "checking" | "connected" | "unreachable";
+type Section = "home" | "conversations";
 
 export function App() {
   const service = useMemo(() => new ConnectionService(new ElectronConnectionAdapter()), []);
   const [baseUrl, setBaseUrl] = useState("");
   const [status, setStatus] = useState<ViewStatus>("loading");
   const [message, setMessage] = useState("Buscando un servidor guardado...");
+  const [locked, setLocked] = useState(false);
+  const [user, setUser] = useState<DesktopUser | null>(null);
+  const [section, setSection] = useState<Section>("home");
 
   useEffect(() => {
     let active = true;
     async function restore() {
       try {
-        const saved = await service.load();
+        const settings = await service.load();
         if (!active) return;
-        if (!saved) {
+        setLocked(settings.locked);
+        if (!settings.baseUrl) {
           setStatus("idle");
           setMessage("Introduce la dirección de tu servidor para comenzar.");
           return;
         }
-        setBaseUrl(saved);
+        setBaseUrl(settings.baseUrl);
         setStatus("checking");
-        const result = await service.check(saved);
+        setMessage("Comprobando conexión...");
+        const result = await service.check(settings.baseUrl);
         if (active) applyResult(result);
       } catch {
         if (active) {
@@ -37,6 +46,35 @@ export function App() {
     void restore();
     return () => { active = false; };
   }, [service]);
+
+  // Once the server answers, a saved session opens straight into the conversations.
+  useEffect(() => {
+    if (status !== "connected") return;
+    let active = true;
+    void window.desktop.auth.state().then(({ user: restored }) => {
+      if (!active) return;
+      setUser(restored);
+      if (restored) setSection("conversations");
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [status]);
+
+  // A token the server stopped accepting (revoked, expired) lands back on the sign-in.
+  useEffect(() => window.desktop.auth.onSignedOut(() => {
+    setUser(null);
+    setSection("home");
+  }), []);
+
+  function signedIn(signed: DesktopUser) {
+    setUser(signed);
+    setSection("conversations");
+  }
+
+  async function signOut() {
+    await window.desktop.auth.logout().catch(() => {});
+    setUser(null);
+    setSection("home");
+  }
 
   function applyResult(result: ConnectionResult) {
     setBaseUrl(result.baseUrl);
@@ -66,8 +104,10 @@ export function App() {
           <span>DESKTOP / OPERADOR</span>
         </div>
         <nav className="sidebar__nav" aria-label="Navegación">
-          <span className="sidebar__nav-item sidebar__nav-item--active"><span>⌁</span> Inicio</span>
-          <span className="sidebar__nav-item sidebar__nav-item--disabled"><span>◇</span> Conversaciones <small>PRONTO</small></span>
+          <button type="button" className={`sidebar__nav-item sidebar__nav-button${section === "home" ? " sidebar__nav-item--active" : ""}`} onClick={() => setSection("home")}><span>⌁</span> Inicio</button>
+          {user
+            ? <button type="button" className={`sidebar__nav-item sidebar__nav-button${section === "conversations" ? " sidebar__nav-item--active" : ""}`} onClick={() => setSection("conversations")}><span>◇</span> Conversaciones</button>
+            : <span className="sidebar__nav-item sidebar__nav-item--disabled"><span>◇</span> Conversaciones <small>INICIA SESIÓN</small></span>}
           <span className="sidebar__nav-item sidebar__nav-item--disabled"><span>▧</span> Herramientas <small>PRONTO</small></span>
         </nav>
         <div className="sidebar__bottom">
@@ -81,10 +121,11 @@ export function App() {
 
       <main className="workspace">
         <header className="topbar">
-          <div><span className="topbar__prompt">❯</span> PUESTO DE TRABAJO <span className="topbar__slash">/</span> CONEXIÓN</div>
+          <div><span className="topbar__prompt">❯</span> PUESTO DE TRABAJO <span className="topbar__slash">/</span> {section === "conversations" && user ? "CONVERSACIONES" : "CONEXIÓN"}</div>
           <div className="topbar__right"><span className="topbar__pulse" /> SISTEMA LOCAL</div>
         </header>
 
+        {section === "conversations" && user ? <Workbench user={user} onSignOut={() => void signOut()} /> : (
         <div className="workspace__content">
           <div className="hero">
             <p className="eyebrow"><span className="eyebrow__line" /> EL CAMINO COMIENZA AQUÍ</p>
@@ -95,10 +136,20 @@ export function App() {
           <div className="grid">
             <section className="connection-card" aria-labelledby="connection-title">
               <div className="card-heading"><span>01 / CONEXIÓN</span><span className="card-heading__accent">● ENLACE SEGURO</span></div>
-              <h2 id="connection-title">Conecta tu servidor</h2>
-              <p className="connection-card__copy">Usa la dirección que te proporcione tu organización. Puedes cambiarla más adelante.</p>
+              <h2 id="connection-title">{locked ? "Servidor de THE WAY" : "Conecta tu servidor"}</h2>
+              <p className="connection-card__copy">
+                {locked
+                  ? "Esta versión se conecta automáticamente al servidor oficial de THE WAY."
+                  : "Usa la dirección que te proporcione tu organización. Puedes cambiarla más adelante."}
+              </p>
               <form onSubmit={connect}>
                 <label htmlFor="server-url">DIRECCIÓN DEL SERVIDOR</label>
+                {locked ? (
+                  <div className="url-field url-field--locked">
+                    <span aria-hidden="true">⚿</span>
+                    <output id="server-url">{baseUrl}</output>
+                  </div>
+                ) : (
                 <div className="url-field">
                   <span aria-hidden="true">❯</span>
                   <input
@@ -117,9 +168,10 @@ export function App() {
                     disabled={status === "loading" || status === "checking"}
                   />
                 </div>
-                <p className="field-help">Para desarrollo local: http://localhost:8000</p>
+                )}
+                <p className="field-help">{locked ? "Dirección fijada en esta versión de la aplicación." : "Para desarrollo local: http://localhost:8000"}</p>
                 <button className="connect-button" type="submit" disabled={status === "loading" || status === "checking" || !baseUrl.trim()}>
-                  {status === "checking" ? "COMPROBANDO..." : connected ? "VOLVER A COMPROBAR" : "CONECTAR SERVIDOR"}
+                  {status === "checking" ? "COMPROBANDO..." : connected || locked ? "VOLVER A COMPROBAR" : "CONECTAR SERVIDOR"}
                   <span aria-hidden="true">↗</span>
                 </button>
               </form>
@@ -132,6 +184,7 @@ export function App() {
               </div>
             </section>
 
+            {connected && !user ? <SignIn onSignedIn={signedIn} /> : (
             <section className="flow-card" aria-labelledby="flow-title">
               <div className="card-heading"><span>02 / TU FLUJO</span><span>THE WAY</span></div>
               <h2 id="flow-title">Un agente. Dos mundos.</h2>
@@ -154,9 +207,11 @@ export function App() {
                 </div>
               </div>
             </section>
+            )}
           </div>
-          <p className="next-step">{connected ? "SERVIDOR LISTO · EL SIGUIENTE PASO ES INICIAR SESIÓN" : "CONEXIÓN REQUERIDA PARA CONTINUAR"}</p>
+          <p className="next-step">{!connected ? "CONEXIÓN REQUERIDA PARA CONTINUAR" : user ? `SESIÓN INICIADA · ${user.email}` : "SERVIDOR LISTO · EL SIGUIENTE PASO ES INICIAR SESIÓN"}</p>
         </div>
+        )}
       </main>
     </div>
   );

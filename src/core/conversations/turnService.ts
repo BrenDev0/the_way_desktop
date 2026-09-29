@@ -1,0 +1,209 @@
+import {
+  ApiError,
+  type ChatMessage,
+  type Conversation,
+  type ConversationEventsPort,
+  type ServerApiPort,
+  type ToolActivity,
+  type ToolResolution,
+} from "../api";
+import type { SseEvent } from "../sse";
+import type { ToolRunner } from "../tools/runner";
+
+export interface TurnEvents {
+  /** Every change worth redrawing: status, pending calls, a finished turn. */
+  update(conversation: Conversation): void;
+  /** A piece of the assistant's reply, as the model writes it. */
+  text?(conversationId: string, text: string): void;
+  /** A message the turn added -- the assistant's, or a tool result (clipped). */
+  message?(conversationId: string, message: ChatMessage): void;
+  /** A server-side tool starting or finishing. */
+  activity?(conversationId: string, activity: ToolActivity): void;
+}
+
+export interface TurnOptions {
+  /** How long the stream may stay silent before it is presumed dead. The server sends a
+   *  keep-alive every 15 seconds, so this is three missed in a row. */
+  silenceMilliseconds?: number;
+  sleep?: (milliseconds: number) => Promise<void>;
+}
+
+const RETRY_LIMIT_MS = 10_000;
+const defaultSleep = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+/** The stream said the turn is waiting on this machine; drive() settles it off-stream. */
+class Paused {
+  constructor(readonly conversation: Conversation) {}
+}
+
+/**
+ * Drives a conversation from the desktop side, over the server's event stream.
+ *
+ * The server does the thinking and publishes what happens -- status changes, reply text as
+ * it is written, tool activity. This follows that stream; whenever the turn pauses on tool
+ * calls it closes the stream, has the runner settle every call (run here, approved, or
+ * refused -- which can mean waiting on the user), posts the answers back in one go, and
+ * reopens the stream after the last event it saw. One turn can pause many times.
+ */
+export class TurnService {
+  private readonly inFlight = new Map<string, Promise<Conversation>>();
+  private readonly silence: number;
+  private readonly sleep: (milliseconds: number) => Promise<void>;
+
+  constructor(
+    private readonly api: ServerApiPort,
+    private readonly stream: ConversationEventsPort,
+    private readonly runner: ToolRunner,
+    private readonly events: TurnEvents,
+    options: TurnOptions = {},
+  ) {
+    this.silence = options.silenceMilliseconds ?? 45_000;
+    this.sleep = options.sleep ?? defaultSleep;
+  }
+
+  list(): Promise<Conversation[]> {
+    return this.api.request("GET", "/conversations");
+  }
+
+  create(title: string): Promise<Conversation> {
+    return this.api.request("POST", "/conversations", { title, client: "desktop" });
+  }
+
+  messages(conversationId: string): Promise<ChatMessage[]> {
+    return this.api.request("GET", `/conversations/${conversationId}/messages`);
+  }
+
+  remove(conversationId: string): Promise<unknown> {
+    return this.api.request("DELETE", `/conversations/${conversationId}`);
+  }
+
+  async send(conversationId: string, message: string): Promise<Conversation> {
+    const started = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/messages`, { message });
+    this.events.update(started);
+    return this.drive(conversationId);
+  }
+
+  /**
+   * Follows a turn to its end. Safe to call on any conversation -- opening one that was
+   * left paused (the app closed mid-turn) picks it up where it stopped -- and a second
+   * call for a conversation already being driven shares the first one's result.
+   */
+  drive(conversationId: string): Promise<Conversation> {
+    const existing = this.inFlight.get(conversationId);
+    if (existing) return existing;
+    const running = this.follow(conversationId).finally(() => this.inFlight.delete(conversationId));
+    this.inFlight.set(conversationId, running);
+    return running;
+  }
+
+  private async follow(conversationId: string): Promise<Conversation> {
+    let lastEventId: string | undefined;
+    let failures = 0;
+    // Answers already posted: a status replayed from before they landed must not ask twice.
+    const answered = new Set<string>();
+
+    for (;;) {
+      try {
+        const outcome = await this.watch(conversationId, lastEventId, answered, (id) => { lastEventId = id; });
+        failures = 0;
+        if (outcome instanceof Paused) {
+          await this.settle(conversationId, outcome.conversation, answered);
+          continue;
+        }
+        if (outcome) return outcome;
+        // the server ends a stream after a while; carry on from the last event seen
+      } catch (error) {
+        // signed out, or the conversation is gone: no retry will change that
+        if (error instanceof ApiError && (error.status === 401 || error.status === 404)) throw error;
+        failures += 1;
+        await this.sleep(Math.min(1000 * 2 ** (failures - 1), RETRY_LIMIT_MS));
+      }
+    }
+  }
+
+  /** Reads one connection's events. Resolves with the finished conversation, a pause to
+   *  settle, or undefined when the stream ended and should be reopened. */
+  private async watch(
+    conversationId: string,
+    lastEventId: string | undefined,
+    answered: Set<string>,
+    seen: (id: string) => void,
+  ): Promise<Conversation | Paused | undefined> {
+    const controller = new AbortController();
+    let quiet: ReturnType<typeof setTimeout> | undefined;
+    const listen = () => {
+      clearTimeout(quiet);
+      quiet = setTimeout(() => controller.abort(), this.silence);
+    };
+
+    listen();
+    try {
+      for await (const event of this.stream.open(conversationId, lastEventId, controller.signal)) {
+        listen();
+        if (event.id) seen(event.id);
+        const outcome = this.handle(conversationId, event, answered);
+        if (outcome) return outcome;
+      }
+      return undefined;
+    } finally {
+      clearTimeout(quiet);
+      controller.abort();
+    }
+  }
+
+  private handle(conversationId: string, event: SseEvent, answered: Set<string>): Conversation | Paused | undefined {
+    const data: unknown = JSON.parse(event.data);
+
+    if (event.type === "status") {
+      const conversation = data as Conversation;
+      this.events.update(conversation);
+      if (conversation.status === "idle" || conversation.status === "failed") return conversation;
+      const pending = conversation.pendingToolCalls;
+      if (conversation.status === "awaiting_client" && pending.length && pending.every((call) => !answered.has(call.id))) {
+        return new Paused(conversation);
+      }
+      return undefined;
+    }
+
+    if (event.type === "text") this.events.text?.(conversationId, (data as { text: string }).text);
+    else if (event.type === "message") this.events.message?.(conversationId, data as ChatMessage);
+    else if (event.type === "tool.started" || event.type === "tool.finished") {
+      const { id, name, failed } = data as { id: string; name: string; failed?: boolean };
+      this.events.activity?.(conversationId, {
+        id,
+        name,
+        state: event.type === "tool.started" ? "started" : "finished",
+        failed,
+      });
+    }
+    return undefined;
+  }
+
+  private async settle(conversationId: string, paused: Conversation, answered: Set<string>): Promise<void> {
+    // A call is run (or asked about) once. If posting the answers fails and the pause is
+    // seen again, the same answers are sent again -- never a second delete, never the same
+    // approval asked twice.
+    const unsettled = paused.pendingToolCalls.filter((call) => !this.settled.has(call.id));
+    for (const resolution of await this.runner.resolveAll(unsettled)) {
+      this.settled.set(resolution.toolCallId, resolution);
+    }
+    const resolutions = paused.pendingToolCalls.map((call) => this.settled.get(call.id)!);
+
+    try {
+      const resumed = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/tool-results`, {
+        resolutions,
+      });
+      this.events.update(resumed);
+    } catch (error) {
+      // Someone else answered first (another window, a retry that did land): the stream
+      // will say where things stand now.
+      if (!(error instanceof ApiError && error.code === "conversation_not_awaiting_client")) throw error;
+    }
+    for (const call of paused.pendingToolCalls) {
+      answered.add(call.id);
+      this.settled.delete(call.id);
+    }
+  }
+
+  private readonly settled = new Map<string, ToolResolution>();
+}

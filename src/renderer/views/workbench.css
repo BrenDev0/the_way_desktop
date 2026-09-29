@@ -1,0 +1,94 @@
+/* The signed-in views. Built from the tokens in theme.css and the card patterns in styles.css. */
+
+.sidebar__nav-button { width: 100%; border: 0; background: transparent; font: inherit; text-align: left; }
+.sidebar__nav-button:hover { color: var(--text-bright); }
+
+.ghost-button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.ghost-button:hover { border-color: var(--magenta); color: var(--text-bright); }
+
+.signin-card { max-width: 520px; }
+.signin-card__label { margin-top: 16px; }
+.signin-card__submit { margin-top: 22px; }
+
+.workbench { position: relative; display: grid; grid-template-columns: 240px minmax(0, 1fr); flex: 1; min-height: 0; }
+.workbench--files { grid-template-columns: 240px minmax(0, 1fr) minmax(280px, 340px); }
+
+.workbench__threads { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 18px 14px; border-right: 1px solid var(--border-dim); }
+.workbench__new { min-height: 40px; }
+.workbench__label { flex: none; margin-top: 4px; color: var(--magenta); font-size: 9px; font-weight: 700; letter-spacing: .16em; text-shadow: var(--glow-magenta); }
+.workbench__label--row { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border-dim); }
+.workbench__add { width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 3px; background: transparent; color: var(--text); font: inherit; font-size: 14px; line-height: 1; }
+.workbench__add:hover { border-color: var(--accent); color: var(--accent); }
+/* Conversations take the free height; projects get at most a third of it, each scrolling on its own. */
+.workbench__list { flex: 1; min-height: 0; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.workbench__list--projects { flex: 0 1 auto; max-height: 34%; }
+.workbench__none { padding: 6px 10px; color: var(--muted); font-size: 11px; }
+.workbench__project-input { width: 100%; margin-bottom: 4px; padding: 7px 9px; }
+.workbench__error { flex: none; margin: 0; color: var(--error); font-size: 11px; line-height: 1.4; }
+.chat__files-toggle { margin-left: auto; flex: none; }
+
+/* Three columns do not fit a small window: the files panel slides over the chat instead. */
+@media (max-width: 1250px) {
+  .workbench--files { grid-template-columns: 220px minmax(0, 1fr); }
+  .workbench--files > .files { position: absolute; top: 0; right: 0; bottom: 0; z-index: 20; width: min(340px, 62%); box-shadow: -18px 0 40px rgba(0, 0, 0, 0.55); }
+  .workbench { grid-template-columns: 220px minmax(0, 1fr); }
+}
+.thread { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); text-align: left; }
+.thread:hover { border-color: var(--border-dim); }
+.thread--active { border-color: rgba(0, 255, 0, 0.25); background: rgba(0, 255, 0, 0.05); }
+.thread__title { overflow: hidden; color: var(--text-bright); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.thread__status { color: var(--muted); font-size: 9px; letter-spacing: .1em; }
+.thread__status--running, .thread__status--awaiting_client { color: var(--accent); }
+.thread__status--failed { color: var(--error); }
+.workbench__account { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-dim); color: var(--muted); font-size: 11px; }
+.workbench__account > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.chat__bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-dim); }
+.chat__folder { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.chat__notice { margin: 10px 20px 0; padding: 8px 12px; border-left: 2px solid var(--warn); background: rgba(242, 196, 109, 0.06); color: var(--warn); font-size: 12px; }
+
+.chat__log { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 20px; overflow-y: auto; }
+.chat__empty { margin: auto; max-width: 440px; color: var(--muted); font-size: 13px; text-align: center; }
+.chat__empty .eyebrow { justify-content: center; }
+.bubble { max-width: 78%; padding: 10px 14px; border: 1px solid var(--border-dim); border-radius: var(--radius); background: var(--panel); }
+.bubble p { margin: 0; color: var(--text-bright); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble--user { align-self: flex-end; border-color: rgba(0, 255, 0, 0.3); background: rgba(0, 255, 0, 0.05); }
+.bubble--assistant { align-self: flex-start; }
+/* The reply while it is still being written: a blinking cursor at its end. */
+.bubble--live p::after { content: "▍"; margin-left: 2px; color: var(--accent); animation: live-cursor 1s steps(1) infinite; }
+@keyframes live-cursor { 50% { opacity: 0; } }
+/* Tool activity inside an assistant turn: one line each, the result a click away. */
+.bubble__tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.bubble__tools:last-child { margin-bottom: 0; }
+.tool { border: 1px solid var(--border-dim); border-left: 2px solid var(--muted); border-radius: 4px; background: var(--field); }
+.tool--equipo { border-left-color: var(--accent); }
+.tool--proyecto { border-left-color: var(--magenta); }
+.tool summary { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; cursor: pointer; list-style: none; font-size: 11px; }
+.tool summary::-webkit-details-marker { display: none; }
+.tool__state { flex: none; width: 12px; color: var(--muted); text-align: center; }
+.tool--done .tool__state { color: var(--accent); }
+.tool--running .tool__state { color: var(--warn); }
+.tool__label { flex: none; color: var(--text-bright); font-weight: 700; letter-spacing: .03em; }
+.tool__place { flex: none; padding: 0 5px; border: 1px solid var(--border-dim); border-radius: 3px; color: var(--muted); font-size: 8px; letter-spacing: .1em; }
+.tool--equipo .tool__place { border-color: rgba(0, 255, 0, 0.35); color: var(--accent); }
+.tool--proyecto .tool__place { border-color: rgba(255, 0, 255, 0.4); color: var(--magenta); }
+.tool__about { min-width: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.tool__result { max-height: 220px; margin: 0; padding: 8px 10px 10px 30px; overflow: auto; border-top: 1px dashed var(--border-dim); color: var(--text); font: inherit; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.chat__status { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 20px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.chat__pending { color: var(--magenta); }
+.chat__error { margin-left: auto; color: var(--error); letter-spacing: .04em; }
+
+.chat__composer { display: flex; gap: 12px; padding: 12px 20px 18px; border-top: 1px solid var(--border-dim); }
+.chat__composer textarea { flex: 1; min-height: 48px; max-height: 160px; padding: 10px 12px; border: 1px solid var(--border-dim); border-radius: 4px; outline: none; background: var(--field); color: var(--text-bright); font: inherit; font-size: 13px; resize: vertical; caret-color: var(--accent); user-select: text; }
+.chat__composer textarea:focus { border-color: var(--magenta); }
+.chat__composer .connect-button { width: auto; min-width: 130px; }
+
+.approval { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.6); }
+.approval__panel { width: min(720px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; }
+.approval__tool { margin: 0 0 10px; color: var(--magenta); font-size: 11px; letter-spacing: .08em; }
+.approval__detail { margin: 0 0 10px; color: var(--text); font-size: 12px; white-space: pre-wrap; }
+.approval__preview { max-height: 320px; margin: 0 0 16px; padding: 12px; overflow: auto; border: 1px solid var(--border-dim); border-radius: 4px; background: var(--field); color: var(--text-bright); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.approval__actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; }
+.approval__actions .connect-button { width: auto; min-width: 160px; }

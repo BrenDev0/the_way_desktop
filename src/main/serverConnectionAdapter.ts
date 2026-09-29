@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ConnectionResult, ServerConnectionPort } from "../core/connection";
+import type { ConnectionResult, ServerConnectionPort, ServerSettings } from "../core/connection";
 
 interface SavedConnection {
   baseUrl: string;
@@ -9,29 +9,32 @@ interface SavedConnection {
 export class ServerConnectionAdapter implements ServerConnectionPort {
   private readonly configPath: string;
 
-  constructor(userDataDirectory: string) {
+  /** With a built-in server, every call targets it and addresses from the renderer are ignored. */
+  constructor(userDataDirectory: string, private readonly builtInUrl: string | null = null) {
     this.configPath = join(userDataDirectory, "connection.json");
   }
 
-  async load(): Promise<string | null> {
+  async load(): Promise<ServerSettings> {
+    if (this.builtInUrl) return { baseUrl: this.builtInUrl, locked: true };
     try {
       const saved = JSON.parse(await readFile(this.configPath, "utf8")) as SavedConnection;
-      return typeof saved.baseUrl === "string" ? saved.baseUrl : null;
+      return { baseUrl: typeof saved.baseUrl === "string" ? saved.baseUrl : null, locked: false };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { baseUrl: null, locked: false };
       throw error;
     }
   }
 
   async connect(baseUrl: string): Promise<ConnectionResult> {
     const result = await this.check(baseUrl);
-    if (result.status === "connected") {
+    if (result.status === "connected" && !this.builtInUrl) {
       await writeFile(this.configPath, JSON.stringify({ baseUrl: result.baseUrl }), "utf8");
     }
     return result;
   }
 
-  async check(baseUrl: string): Promise<ConnectionResult> {
+  async check(requestedUrl: string): Promise<ConnectionResult> {
+    const baseUrl = this.builtInUrl ?? requestedUrl;
     let url: URL;
     try {
       url = new URL(baseUrl);
