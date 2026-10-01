@@ -1,6 +1,6 @@
 /* The files panel beside the chat. Built from theme.css tokens, like workbench.css. */
 
-.files { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border-dim); background: #090f15; }
+.files { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border-dim); background: var(--panel-sunk); }
 /* One tree, two sides: LOCAL (this computer) and REMOTO (the user's projects on the server). */
 .files__switchbar { display: flex; align-items: stretch; flex: none; min-height: 43px; border-bottom: 1px solid var(--border-dim); }
 .files__switch { display: flex; flex: 1; align-items: center; justify-content: center; gap: 12px; padding: 0 12px; border: 0; background: transparent; font: inherit; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
@@ -23,20 +23,21 @@
 .files__empty { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 16px; padding: 24px; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
 .files__empty p { margin: 0; }
 .files__hint { flex: none; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.files__notice { flex: none; margin: 0; padding: 8px 10px; border-left: 2px solid var(--accent); background: rgba(0, 255, 0, 0.05); color: var(--accent); font-size: 11px; line-height: 1.5; }
-.files__notice--error { border-left-color: var(--error); background: rgba(255, 120, 144, 0.07); color: var(--error); }
-.files__confirm { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid rgba(255, 120, 144, 0.4); border-radius: 4px; background: rgba(255, 120, 144, 0.05); color: var(--text-bright); font-size: 11px; line-height: 1.5; }
+.files__notice { flex: none; margin: 0; padding: 8px 10px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); color: var(--accent); font-size: 11px; line-height: 1.5; }
+.files__notice--error { border-left-color: var(--error); background: color-mix(in srgb, var(--error) 7%, transparent); color: var(--error); }
+.files__confirm { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid color-mix(in srgb, var(--error) 40%, transparent); border-radius: 4px; background: color-mix(in srgb, var(--error) 5%, transparent); color: var(--text-bright); font-size: 11px; line-height: 1.5; }
 .files__confirm > span { flex-basis: 100%; }
 
 /* The one scrolling area in the panel, like the chat log. */
 .tree { flex: 1; min-height: 0; margin: 0 -12px; padding: 2px 0; overflow-y: auto; border-block: 1px solid var(--border-dim); }
-.tree--drop { background: rgba(255, 0, 255, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 0, 255, 0.35); }
+.tree--drop { background: color-mix(in srgb, var(--magenta) 4%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--magenta) 35%, transparent); }
 .tree ul { margin: 0; padding: 0; list-style: none; }
 .tree > .files__hint { padding: 14px; }
 .tree__row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 12px 4px 10px; border: 0; border-left: 2px solid transparent; background: transparent; color: var(--text); font: inherit; font-size: 12px; text-align: left; }
-.tree__row:hover { background: #ffffff06; color: var(--text-bright); }
-.tree__row--selected, .tree__row--selected:hover { border-left-color: var(--accent); background: rgba(0, 255, 0, 0.07); color: var(--accent); }
-.tree__row--drop { background: rgba(255, 0, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 0, 255, 0.45); }
+.tree__badge { flex: none; margin-left: auto; color: var(--magenta); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-shadow: var(--glow-magenta); }
+.tree__row:hover { background: color-mix(in srgb, var(--tint) 2.4%, transparent); color: var(--text-bright); }
+.tree__row--selected, .tree__row--selected:hover { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); color: var(--accent); }
+.tree__row--drop { background: color-mix(in srgb, var(--magenta) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--magenta) 45%, transparent); }
 .tree__row--editing { cursor: default; }
 .tree__row--project .tree__name { color: var(--text-bright); font-weight: 700; }
 .tree__loading { margin: 0; padding: 6px 12px 6px 38px; }
@@ -44,6 +45,41 @@
 .tree__row--selected .tree__icon { color: var(--accent); }
 .tree__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree__meta { flex: none; margin-left: auto; color: var(--muted); font-size: 10px; }
+/*
+ * Fluorescent pipes: each item below the top level hangs from its parent's arrow by a
+ * glowing tube -- down the parent's column, then an elbow into the row. The row indent is
+ * 10px + 14px a level and the arrow is 12px wide, so a parent's arrow is centred at
+ * 16px + 14px x (depth - 1). Green on this computer, magenta on the server.
+ */
+.tree { --pipe: var(--accent); --pipe-soft: color-mix(in srgb, var(--accent) 45%, transparent); --pipe-halo: 0 0 4px var(--pipe), 0 0 10px var(--pipe-soft); --pipe-hot: #fff; }
+.tree--remote { --pipe: var(--magenta); --pipe-soft: color-mix(in srgb, var(--magenta) 45%, transparent); }
+/* On white a wide halo is only a smudge, and a white-hot elbow vanishes: a tight glow, and
+   the hot elbow in the pipe's own colour. */
+[data-theme="light"] .tree { --pipe-halo: 0 0 2px var(--pipe-soft); --pipe-hot: var(--pipe); }
+.tree__item { position: relative; }
+.tree__item::before, .tree__item::after { content: ""; position: absolute; z-index: 1; pointer-events: none; border-radius: 2px; background: var(--pipe); }
+/* the tube down the parent's column; it carries on to the next sibling, and the last one ends at its own row */
+.tree__item::before {
+  top: 0; bottom: 0; left: calc(17px + (var(--depth) - 1) * 14px); width: 2px;
+  background: linear-gradient(to bottom, var(--pipe-soft) 0%, var(--pipe) 45%, #ffffffcc 50%, var(--pipe) 55%, var(--pipe-soft) 100%);
+  background-size: 100% 180px;
+  box-shadow: var(--pipe-halo);
+  animation: tree-flow 3.2s linear infinite;
+}
+.tree__item:last-child::before { bottom: auto; height: 16px; }
+/* the first one reaches up to come out from under its parent's arrow */
+.tree__item:first-child::before { top: -9px; }
+.tree__item:first-child:last-child::before { height: 25px; }
+/* the elbow into this row, stopping just short of its arrow */
+.tree__item::after {
+  top: 14px; left: calc(17px + (var(--depth) - 1) * 14px); width: 9px; height: 2px;
+  box-shadow: var(--pipe-halo);
+}
+/* a selected row's elbow burns brighter */
+.tree__item:has(> .tree__row--selected)::after { background: var(--pipe-hot); box-shadow: 0 0 6px var(--pipe), 0 0 14px var(--pipe-soft); }
+@keyframes tree-flow { from { background-position: 0 -180px; } to { background-position: 0 180px; } }
+@media (prefers-reduced-motion: reduce) { .tree__item::before { animation: none; } }
+
 .tree__input { flex: 1; min-width: 0; padding: 3px 6px; border: 1px solid var(--magenta); border-radius: 3px; outline: none; background: var(--field); color: var(--text-bright); font: inherit; font-size: 12px; user-select: text; caret-color: var(--accent); }
 
 .files__upload-open { flex: none; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 0; padding: 10px 14px; font-size: 11px; }

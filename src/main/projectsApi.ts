@@ -1,4 +1,4 @@
-import type { ServerApiPort } from "../core/api";
+import type { FileBytes, ServerApiPort } from "../core/api";
 import type { ProjectRef, ProjectsApiPort, RemoteFolder, RemoteTree } from "../core/tools/ports";
 
 interface UploadTicket {
@@ -57,12 +57,25 @@ export class ProjectsApi implements ProjectsApiPort {
   }
 
   async download(projectId: string, fileId: string): Promise<Uint8Array> {
+    return (await this.content(projectId, fileId)).data;
+  }
+
+  /**
+   * A file's bytes and type. Through the server where it can: a presigned URL names the
+   * bucket as the server sees it, which under Docker is a host this computer cannot reach.
+   */
+  async content(projectId: string, fileId: string): Promise<FileBytes> {
+    if (this.api.bytes) return this.api.bytes(`/projects/${projectId}/files/${fileId}/content`);
+
     const { downloadUrl } = await this.api.request<{ downloadUrl: string }>(
       "GET",
       `/projects/${projectId}/files/${fileId}/download`,
     );
     const response = await fetch(downloadUrl, { signal: AbortSignal.timeout(TRANSFER_TIMEOUT) });
     if (!response.ok) throw new Error(`The file store refused the download (${response.status}).`);
-    return new Uint8Array(await response.arrayBuffer());
+    return {
+      data: new Uint8Array(await response.arrayBuffer()),
+      contentType: response.headers.get("content-type") ?? "application/octet-stream",
+    };
   }
 }

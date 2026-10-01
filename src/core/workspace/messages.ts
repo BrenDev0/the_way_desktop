@@ -20,6 +20,9 @@ const SERVER: Record<string, string> = {
   project_entry_name_taken: "Ya hay un archivo o carpeta con ese nombre en el proyecto.",
   file_too_large: "El archivo supera los 5 GB que admite un proyecto.",
   project_storage_unavailable: "El almacenamiento de proyectos no está disponible. Inténtalo más tarde.",
+  file_content_missing:
+    "Este archivo aparece en el proyecto, pero su contenido ya no está en el almacenamiento. Vuelve a generarlo o elimina la entrada.",
+  file_too_large_to_open: "Este archivo es demasiado grande para abrirlo aquí. Descárgalo desde el panel de archivos.",
 };
 
 export function operatorMessage(error: unknown): string {
@@ -38,5 +41,10 @@ export function operatorMessage(error: unknown): string {
   if (text.includes("refused the upload") || text.includes("refused the download")) {
     return "El almacenamiento rechazó la transferencia. Inténtalo de nuevo.";
   }
+  // the viewer finding a file by the agent's own words for it
+  if (text.startsWith("No project named")) return SERVER.project_not_found;
+  if (text.startsWith("Nothing named")) return "Ese archivo ya no está en el proyecto: puede que se haya movido o eliminado.";
+  if (text.includes("has not finished uploading")) return SERVER.file_not_uploaded;
+  if (text.includes("is a folder, not a file")) return "Eso es una carpeta, no un archivo.";
   return "No se pudo completar la acción.";
 }

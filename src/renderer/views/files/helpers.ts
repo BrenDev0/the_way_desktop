@@ -1,5 +1,15 @@
 /** Small things the files panel's views share. */
 
+import type { CSSProperties } from "react";
+
+/**
+ * What a tree item needs for its glowing pipe (files.css): the depth it sits at. A row
+ * at the top level hangs from nothing, so it gets none.
+ */
+export function pipe(depth: number): { className?: string; style?: CSSProperties } {
+  return depth > 0 ? { className: "tree__item", style: { "--depth": depth } as CSSProperties } : {};
+}
+
 /** Electron wraps a handler's error as "Error invoking remote method 'x': Error: <message>". */
 export function errorText(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);

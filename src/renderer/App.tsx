@@ -5,7 +5,6 @@ import { ConnectionService } from "../core/connectionService";
 import { ElectronConnectionAdapter } from "./infrastructure/ElectronConnectionAdapter";
 import { Logo } from "./Logo";
 import { conversationStore } from "./state/conversations";
-import { ConversationList } from "./views/ConversationList";
 import { SignIn } from "./views/SignIn";
 import { Workbench } from "./views/Workbench";
 
@@ -169,27 +168,11 @@ export function App() {
   }
 
   return (
+    // One column of work: the logo, the account and the server's state ride on the files
+    // column (Workbench), and conversations are picked by the message box.
     <div className="desktop">
-      <aside className="sidebar">
-        <div className="sidebar__brand">
-          <Logo />
-          <span>DESKTOP / OPERADOR</span>
-        </div>
-        <ConversationList />
-        <div className="sidebar__bottom">
-          <div className="sidebar__account">
-            <span className="selectable" title={user.email}>{user.email}</span>
-            <button type="button" className="ghost-button" onClick={() => void signOut()}>SALIR</button>
-          </div>
-          <div className="sidebar__status">
-            <span className={connected ? "dot dot--on" : "dot"} />
-            <span>{connected ? "SERVIDOR CONECTADO" : "SERVIDOR SIN CONEXIÓN"}</span>
-          </div>
-        </div>
-      </aside>
-
       <main className="workspace">
-        <Workbench user={user} />
+        <Workbench user={user} connected={connected} onSignOut={() => void signOut()} />
       </main>
     </div>
   );

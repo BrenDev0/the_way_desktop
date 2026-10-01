@@ -24,6 +24,12 @@ export interface PendingToolCall {
   location: ToolLocation;
   requiresApproval: boolean;
   detail: string | null;
+  /** Arguments the approver may pick, and the values allowed -- e.g. the image model. */
+  choices?: Record<string, string[]>;
+  /** A fuller description for the approval, when the tool has one. */
+  preview?: string | null;
+  /** Asked even in auto mode: it spends the user's money (an image). */
+  alwaysAsk?: boolean;
 }
 
 export type ConversationStatus = "idle" | "running" | "awaiting_client" | "failed";
@@ -54,6 +60,8 @@ export interface ToolResolution {
   /** What a desktop tool returned. Required when approving a desktop call. */
   output?: string | null;
   failed?: boolean;
+  /** The approver's picks among the call's choices. */
+  args?: Record<string, string>;
 }
 
 /** An error the server answered with: `{ message, code }` and the HTTP status. */
@@ -73,6 +81,13 @@ export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 /** Authenticated calls to the desktop API. The adapter adds the base URL and token. */
 export interface ServerApiPort {
   request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T>;
+  /** A GET whose answer is a file, not JSON. */
+  bytes?(path: string): Promise<FileBytes>;
+}
+
+export interface FileBytes {
+  data: Uint8Array;
+  contentType: string;
 }
 
 /** A conversation's live events (GET /conversations/{id}/events), until the stream ends
@@ -95,7 +110,8 @@ export interface ToolActivity {
   taskId?: string;
 }
 
-export type TaskStatus = "running" | "done" | "failed";
+/** needs_approval: stopped on a call only the user can approve; it carries on once they answer. */
+export type TaskStatus = "running" | "needs_approval" | "done" | "failed";
 
 /** GET /background-tasks and /background-tasks/{id}: a task the user's agent started. */
 export interface BackgroundTask {
@@ -109,6 +125,8 @@ export interface BackgroundTask {
   deliverPath: string | null;
   createdAt: string;
   updatedAt: string;
+  /** While needs_approval: the calls it waits on. Answered at POST .../{id}/approvals. */
+  pendingApproval?: PendingToolCall[];
 }
 
 /** task.started / task.finished on the stream of the conversation that started the task. */

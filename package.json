@@ -1,6 +1,6 @@
 {
   "name": "da-the-way",
-  "productName": "THE WAY Desktop",
+  "productName": "THE WAY",
   "version": "0.1.0",
   "description": "Operator desktop client for THE WAY",
   "private": true,
@@ -11,6 +11,7 @@
     "test": "vitest run",
     "theme:sync": "node scripts/theme.mjs sync",
     "theme:check": "node scripts/theme.mjs check",
+    "icon": "electron scripts/icon.cjs",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
@@ -20,7 +21,9 @@
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",

@@ -117,6 +117,54 @@ describe("TurnService over the event stream", () => {
     expect(stream.opened).toEqual([undefined, "2-0"]);
   });
 
+  it("tells the server which folder is open, read afresh for every message and resume", async () => {
+    const stream = new ScriptedStream([
+      [status(conversation("awaiting_client", [call()]), "1-0")],
+      [status(conversation("idle"), "2-0")],
+      [status(conversation("idle"), "3-0")],
+    ]);
+    const api = new Api();
+    let folder: string | null = null;
+    const turns = new TurnService(api, stream, new ToolRunner({ ReadFile: { run: async () => "x" } }, { request: async () => ({ approved: true }) }), {
+      update: () => {},
+    }, { sleep: async () => {}, folder: async () => folder });
+
+    await turns.send("conv", "crea prueba__2");
+    folder = "C:/Users/Xplorers/Desktop";
+    await turns.send("conv", "ya está abierta");
+
+    // none open is said as "", so the agent is told -- the old app said nothing at all
+    expect(api.posted.map((p) => (p.body as { localFolder?: string }).localFolder)).toEqual(["", "", "C:/Users/Xplorers/Desktop"]);
+  });
+
+  it("says the project folder instead when the user works on the server", async () => {
+    const stream = new ScriptedStream([[status(conversation("idle"), "1-0")]]);
+    const api = new Api();
+    const turns = new TurnService(api, stream, new ToolRunner({}, { request: async () => ({ approved: true }) }), {
+      update: () => {},
+    }, { sleep: async () => {}, folder: async () => "C:/Users/me/Desktop", remote: async () => "cx/nuevo_prueba" });
+
+    await turns.send("conv", "crea un archivo aquí");
+
+    expect(api.posted[0].body).toMatchObject({ remoteFolder: "cx/nuevo_prueba" });
+    expect(api.posted[0].body).not.toHaveProperty("localFolder");
+  });
+
+  it("asks for a spoken reply on send and again on every resume of that turn", async () => {
+    const stream = new ScriptedStream([
+      [status(conversation("awaiting_client", [call()]), "1-0")],
+      [status(conversation("idle"), "2-0")],
+      [status(conversation("awaiting_client", [call({ id: "c2" })]), "3-0")],
+      [status(conversation("idle"), "4-0")],
+    ]);
+    const { turns, api } = service(stream);
+
+    await turns.send("conv", "what is in notes.txt?", true);
+    await turns.send("conv", "and now?");
+
+    expect(api.posted.map((p) => (p.body as { voice?: boolean }).voice)).toEqual([true, true, undefined, undefined]);
+  });
+
   it("reports server tool activity", async () => {
     const stream = new ScriptedStream([[
       { id: "1-0", type: "tool.started", data: JSON.stringify({ id: "t1", name: "ListProjects", args: {} }) },

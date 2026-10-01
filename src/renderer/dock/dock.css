@@ -1,0 +1,174 @@
+/* The task strip on the screen edge, in THE WAY's look: CRT screens on a glowing pipe.
+   Its window is transparent: only what is drawn here is painted, so everything else shows
+   the desktop through it. */
+
+html.dock-page, html.dock-page body, html.dock-page #root { background: transparent; }
+html.dock-page body::before, html.dock-page body::after { display: none; }
+
+.dock { display: flex; align-items: center; justify-content: flex-end; gap: 14px; height: 100%; padding: 0 14px 0 0; pointer-events: none; }
+.dock [data-hit] { pointer-events: auto; }
+
+/* --- the pipe ---------------------------------------------------------------------- */
+
+/* One tube down the screen edge, through the middle of every tile. The pulse in it runs
+   slow when all is still and quickens while anything works. */
+.dock__rail { position: relative; display: flex; align-items: center; max-height: 100%; }
+.dock__rail::before {
+  content: ""; position: absolute; top: 4px; bottom: 4px; left: 50%; width: 2px; margin-left: -1px; border-radius: 2px;
+  background: linear-gradient(to bottom, rgba(0, 255, 0, 0) 0%, rgba(0, 255, 0, 0.45) 8%, var(--accent) 46%, #ffffffcc 50%, var(--accent) 54%, rgba(0, 255, 0, 0.45) 92%, rgba(0, 255, 0, 0) 100%);
+  background-size: 100% 220px;
+  box-shadow: 0 0 5px var(--accent), 0 0 12px rgba(0, 255, 0, 0.4);
+  animation: dock-flow 5s linear infinite;
+}
+.dock__rail--busy::before { animation-duration: 1.4s; }
+@keyframes dock-flow { from { background-position: 0 -220px; } to { background-position: 0 220px; } }
+
+.dock__icons { position: relative; display: flex; flex-direction: column; gap: 18px; max-height: 100%; margin: 0; padding: 16px 0; overflow-y: auto; list-style: none; scrollbar-width: none; }
+.dock__slot { position: relative; animation: dock-arrive .5s cubic-bezier(.2, .9, .3, 1.25) .35s both; }
+@keyframes dock-arrive {
+  from { opacity: 0; transform: translateX(-90px) scale(.4); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- the tiles: small CRT screens ---------------------------------------------------- */
+
+.dock__tile { --glow: var(--accent); position: relative; display: block; width: 52px; height: 52px; padding: 4px; border: 1px solid #2c3a42; border-radius: 9px; background: linear-gradient(160deg, #1a252d, #0b1116); box-shadow: 0 6px 20px #000000b0, inset 0 1px 0 #ffffff10; font: inherit; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.dock__tile:hover { transform: scale(1.07); border-color: var(--magenta); }
+.dock__tile--open { border-color: var(--magenta); box-shadow: 0 0 0 2px var(--magenta-dim), 0 6px 20px #000000b0; }
+.dock__tile--done { --glow: var(--accent); }
+.dock__tile--failed { --glow: var(--error); }
+.dock__tile--needs_approval { --glow: var(--magenta); border-color: var(--magenta-dim); animation: dock-ask 1.6s ease-in-out infinite; }
+@keyframes dock-ask {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0.55), 0 6px 20px #000000b0; }
+  50% { box-shadow: 0 0 0 8px rgba(255, 0, 255, 0), 0 6px 20px #000000b0; }
+}
+
+/* the glass: dark, curved, scanlined, with a glare in the top corner */
+.dock__screen { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; border-radius: 6px; background: radial-gradient(ellipse at 50% 45%, #0e1a14, #040806 75%); box-shadow: inset 0 0 10px #000, inset 0 0 2px var(--glow); }
+.dock__screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 22% 18%, #ffffff26, transparent 45%),
+    repeating-linear-gradient(to bottom, transparent 0, transparent 2px, rgba(0, 0, 0, 0.35) 3px);
+}
+.dock__mark { position: relative; z-index: 1; color: var(--glow); font-size: 20px; font-weight: 700; line-height: 1; text-shadow: 0 0 6px var(--glow), 0 0 14px var(--glow); }
+/* running: the step count with a terminal cursor blinking after it -- "6▍" */
+.dock__tile--running .dock__screen { display: flex; align-items: center; justify-content: center; gap: 1px; }
+.dock__tile--running .dock__mark { order: 2; font-size: 14px; animation: dock-cursor 1s steps(1) infinite; }
+@keyframes dock-cursor { 50% { opacity: 0; } }
+.dock__count { position: relative; z-index: 1; color: var(--accent); font-size: 15px; font-weight: 700; text-shadow: 0 0 6px var(--accent); font-variant-numeric: tabular-nums; }
+
+/* a picture the task made, on its screen -- green phosphor, scanlined */
+.dock__thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) contrast(1.1) brightness(.95); }
+.dock__tile--picture .dock__screen::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(0, 255, 0, 0.12); mix-blend-mode: screen; pointer-events: none; }
+
+/* the moment a task ends: a green flicker, or a red split signal */
+.dock__tile--glitch-done .dock__screen { animation: dock-glitch-done .9s steps(9) both; }
+.dock__tile--glitch-failed .dock__screen { animation: dock-glitch-failed .9s steps(9) both; }
+@keyframes dock-glitch-done {
+  0% { filter: brightness(2.2); box-shadow: inset 0 0 20px var(--accent); }
+  20% { filter: brightness(.6); transform: translateX(1px); }
+  40% { filter: brightness(1.8) hue-rotate(20deg); transform: translateX(-1px); }
+  60% { filter: brightness(.9); }
+  80% { filter: brightness(1.4); }
+  100% { filter: none; transform: none; }
+}
+@keyframes dock-glitch-failed {
+  0% { filter: brightness(1.8); box-shadow: -3px 0 0 #ff0040, 3px 0 0 #00ffff; transform: translateX(2px); }
+  25% { box-shadow: 3px 0 0 #ff0040, -3px 0 0 #00ffff; transform: translateX(-2px) skewX(-4deg); }
+  50% { filter: brightness(.6); box-shadow: -2px 0 0 #ff0040, 2px 0 0 #00ffff; transform: translateX(1px); }
+  75% { filter: brightness(1.3); transform: skewX(3deg); }
+  100% { filter: none; box-shadow: inset 0 0 10px #000, inset 0 0 2px var(--glow); transform: none; }
+}
+
+.dock__unseen { position: absolute; top: -3px; right: -3px; z-index: 2; width: 11px; height: 11px; border: 2px solid #0b1116; border-radius: 50%; background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+
+.dock__dismiss { position: absolute; bottom: -5px; left: -7px; z-index: 2; display: none; width: 18px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--panel-raised); color: var(--muted); font: inherit; font-size: 12px; line-height: 1; }
+.dock__slot:hover .dock__dismiss { display: grid; place-items: center; }
+.dock__dismiss:hover { border-color: var(--error); color: var(--error); }
+
+/* --- the card: an old monitor powering on -------------------------------------------- */
+
+.dock__card { position: relative; display: flex; flex-direction: column; width: 330px; max-height: min(78vh, 660px); overflow: hidden; border-color: #2c3a42; box-shadow: 0 18px 50px #000000c0, 0 0 0 1px #00ff0012; transform-origin: center; animation: dock-power-on .32s cubic-bezier(.2, .8, .3, 1) both; }
+/* the card's own faint scanlines, as on every screen of the app */
+.dock__card::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0, transparent 2px, rgba(0, 0, 0, 0.12) 3px); }
+.dock__card--off { animation: dock-power-off .2s ease-in both; }
+@keyframes dock-power-on {
+  0% { opacity: 1; transform: scale(.02, .004); filter: brightness(4); }
+  45% { transform: scale(1, .006); filter: brightness(3); }
+  100% { transform: none; filter: none; }
+}
+@keyframes dock-power-off {
+  0% { transform: none; filter: none; }
+  55% { transform: scale(1, .006); filter: brightness(3); }
+  100% { opacity: 0; transform: scale(0, .004); filter: brightness(5); }
+}
+
+.dock__card-head { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: start; flex: none; padding: 10px 0 8px 10px; border-bottom: 1px solid var(--border-dim); }
+.dock__card-head .task__state { padding-top: 2px; color: var(--accent); font-weight: 700; text-shadow: var(--glow-accent); }
+.task--needs_approval .dock__card-head .task__state { color: var(--magenta); text-shadow: var(--glow-magenta); }
+.task--failed .dock__card-head .task__state { color: var(--error); text-shadow: none; }
+.dock__card-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dock__card-head .files__close { margin: -4px 0 0; padding: 0 10px; }
+
+/* the status line, typed out like a terminal answering */
+.dock__prompt { display: block; overflow: hidden; color: var(--accent); font-size: 10px; letter-spacing: .02em; white-space: nowrap; }
+.task--needs_approval .dock__prompt { color: var(--magenta); }
+.task--failed .dock__prompt { color: var(--error); }
+.dock__typed { display: inline-block; overflow: hidden; max-width: 100%; vertical-align: bottom; white-space: nowrap; animation: dock-type .7s steps(36) .25s both; }
+.dock__typed::after { content: "▍"; animation: dock-cursor 1s steps(1) infinite; }
+@keyframes dock-type { from { max-width: 0; } to { max-width: 100%; } }
+
+.dock__card-body { flex: 1; min-height: 0; padding-top: 10px; overflow-y: auto; }
+.dock__card-body .task__body { padding-left: 12px; }
+.dock__card-foot { display: flex; justify-content: flex-end; flex: none; padding: 8px 10px; border-top: 1px solid var(--border-dim); }
+.dock__card-foot .ghost-button { padding: 5px 9px; font-size: 9px; }
+
+/* --- the route: a task's steps as stations on the way --------------------------------- */
+
+.route__head { display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--magenta); font-size: 9px; font-weight: 700; letter-spacing: .14em; text-shadow: var(--glow-magenta); }
+.route__head span:last-child { color: var(--muted); text-shadow: none; }
+.route__line { position: relative; margin: 0; padding: 0 0 0 18px; list-style: none; }
+.route__stop { position: relative; display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 4px 0 4px 6px; font-size: 11px; }
+/* the track: lit behind each station passed, dark ahead */
+.route__stop::before { content: ""; position: absolute; top: 0; bottom: 0; left: -13px; width: 2px; background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+.route__stop:first-child::before { top: 50%; }
+.route__stop:last-child::before { bottom: 50%; }
+.route__stop--running::before, .route__stop--next::before { background: linear-gradient(to bottom, var(--accent), #2c3a42); box-shadow: none; }
+.route__stop--next::before { background: #2c3a42; }
+.route__node { position: absolute; top: 50%; left: -18px; width: 12px; height: 12px; margin-top: -6px; border: 2px solid var(--accent); border-radius: 50%; background: #0b1116; box-shadow: 0 0 6px var(--accent); }
+.route__stop--done .route__node { background: var(--accent); }
+.route__stop--failed .route__node { border-color: var(--error); background: var(--error); box-shadow: 0 0 6px var(--error); }
+.route__stop--running .route__node { border-color: var(--warn); box-shadow: 0 0 0 0 var(--warn); animation: route-here 1.4s ease-out infinite; }
+@keyframes route-here { 0% { box-shadow: 0 0 0 0 rgba(242, 196, 109, 0.7); } 100% { box-shadow: 0 0 0 8px rgba(242, 196, 109, 0); } }
+.route__stop--next .route__node { border-style: dashed; border-color: #44535c; box-shadow: none; }
+.route__label { flex: none; color: var(--text); }
+.route__stop--running .route__label { color: var(--text-bright); }
+.route__stop--failed .route__label { color: var(--error); }
+.route__stop--next .route__label { color: var(--muted); }
+.route__about { min-width: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.route__inner { flex: none; margin-left: auto; padding: 0 5px; border: 1px solid var(--border-dim); border-radius: 8px; color: var(--muted); font-size: 9px; }
+
+/* --- answering a waiting task right here ---------------------------------------------- */
+
+.dock-ask { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--magenta-dim); border-radius: 6px; background: rgba(255, 0, 255, 0.05); }
+.dock-ask__prompt { margin: 0; color: var(--magenta); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-shadow: var(--glow-magenta); }
+.dock-ask__call { display: flex; flex-direction: column; gap: 6px; }
+.dock-ask__what { margin: 0; color: var(--text-bright); font-size: 11px; }
+.dock-ask__preview { max-height: 120px; margin: 0; padding: 6px 8px; overflow: auto; border: 1px solid var(--border-dim); border-radius: 4px; background: var(--field); color: var(--text); font: inherit; font-size: 10px; line-height: 1.5; white-space: pre-wrap; }
+.dock-ask__models { display: flex; gap: 6px; }
+.dock-ask__model { flex: 1; padding: 5px 6px; border: 1px solid var(--border-dim); border-radius: 4px; background: var(--field); color: var(--text); font: inherit; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+.dock-ask__model:hover { border-color: var(--border); }
+.dock-ask__model--on { border-color: var(--magenta); background: rgba(255, 0, 255, 0.1); color: var(--magenta); }
+.dock-ask__covers { margin: 0; color: var(--muted); font-size: 10px; }
+.dock-ask__answer { display: flex; justify-content: flex-end; gap: 8px; }
+.dock-ask__answer .ghost-button { padding: 6px 12px; font-size: 10px; }
+.dock-ask__answer .dock-ask__yes { width: auto; min-height: 32px; padding: 6px 16px; font-size: 10px; }
+.dock-ask__sent { color: var(--accent); font-size: 11px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dock__slot, .dock__card, .dock__card--off, .dock__tile--needs_approval, .dock__typed,
+  .dock__tile--glitch-done .dock__screen, .dock__tile--glitch-failed .dock__screen,
+  .route__stop--running .route__node, .dock__tile--running .dock__mark { animation: none; }
+  .dock__rail::before { animation: none; }
+}

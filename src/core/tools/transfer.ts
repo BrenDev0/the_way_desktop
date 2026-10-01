@@ -93,6 +93,19 @@ function isFolder(entry: RemoteFolder | RemoteFile): entry is RemoteFolder {
   return "parentId" in entry;
 }
 
+/** A file in a project, by the names a person (or the agent's report) would use. */
+export async function findProjectFile(
+  api: ProjectsApiPort,
+  projectName: string,
+  path: string,
+): Promise<{ project: ProjectRef; file: RemoteFile }> {
+  const remote = await Remote.open(api, projectName);
+  const found = remote.resolve(path);
+  if (!found || isFolder(found)) throw new ToolError(`'${path}' in ${remote.project.name} is a folder, not a file`);
+  if (found.status !== "ready") throw new ToolError(`'${found.name}' has not finished uploading`);
+  return { project: remote.project, file: found };
+}
+
 /** An upload over MAX_UPLOAD_FILES or MAX_UPLOAD_BYTES; the message is for the agent. */
 export class UploadLimitError extends ToolError {
   constructor(message: string, readonly limit: "files" | "bytes", readonly amount: number) {

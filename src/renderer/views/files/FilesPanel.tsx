@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ProjectRef } from "../../../core/tools/ports";
+import type { ViewRequest } from "./FileChips";
 import { LocalFilesTab } from "./LocalFilesTab";
 import { RemoteFilesTab, type RemoteFocus } from "./RemoteFilesTab";
 import "./files.css";
@@ -19,12 +20,18 @@ interface Props {
   onTab(tab: FilesTab): void;
   onChooseFolder(): void;
   onProjectsChanged(): Promise<void>;
+  /** Opens a file in the viewer. */
+  onView?(request: ViewRequest): void;
+  /** The project folder the agent works in now, when it works on the server. */
+  workingRemote?: { project: string; path: string } | null;
+  /** Makes a project ("" path) or a folder in one where the agent works. */
+  onWorkHere?(project: string, path: string): Promise<void>;
   /** Shown only when the panel can be dismissed (as an overlay in a small window). */
   onClose?(): void;
 }
 
 /** One file tree with a switch: the operator's folder, or their projects on the server. */
-export function FilesPanel({ folder, projects, tab, localRefresh, serverRefresh, focus, onTab, onChooseFolder, onProjectsChanged, onClose }: Props) {
+export function FilesPanel({ folder, projects, tab, localRefresh, serverRefresh, focus, onTab, onChooseFolder, onProjectsChanged, onView, workingRemote, onWorkHere, onClose }: Props) {
   const [localTarget, setLocalTarget] = useState("");
   const [downloads, setDownloads] = useState(0);
   const [uploads, setUploads] = useState(0);
@@ -59,6 +66,7 @@ export function FilesPanel({ folder, projects, tab, localRefresh, serverRefresh,
           onChooseFolder={onChooseFolder}
           onTargetChange={onTargetChange}
           onUploaded={() => setUploads((n) => n + 1)}
+          onView={onView}
         />
       </div>
       <div className="files__pane" hidden={!remote}>
@@ -70,6 +78,9 @@ export function FilesPanel({ folder, projects, tab, localRefresh, serverRefresh,
           focus={focus}
           onProjectsChanged={onProjectsChanged}
           onDownloaded={() => setDownloads((n) => n + 1)}
+          onView={onView}
+          workingRemote={workingRemote ?? null}
+          onWorkHere={onWorkHere}
         />
       </div>
     </aside>

@@ -1,9 +1,11 @@
-import { ApiError, type HttpMethod, type ServerApiPort } from "../core/api";
+import { ApiError, type FileBytes, type HttpMethod, type ServerApiPort } from "../core/api";
 import type { TokenStorePort } from "../core/auth";
 import type { ServerConnectionPort } from "../core/connection";
 
 const DESKTOP_API = "/api/desktop/v1";
 const TIMEOUT = 30_000;
+// a big file comes through the server, not straight from the bucket
+const FILE_TIMEOUT = 10 * 60_000;
 
 /**
  * Every call to the server goes through here, in the main process. It adds the saved
@@ -77,6 +79,76 @@ export class ApiClient implements ServerApiPort {
       throw new ApiError(response.status, code ?? "error", message ?? `The server answered ${response.status}.`);
     }
     return response.body;
+  }
+
+  /**
+   * A POST whose body or answer is not JSON: a recording going up, spoken audio coming
+   * back. Same address, token and sign-out handling as request(); errors still arrive as
+   * the server's JSON.
+   */
+  async binary(path: string, body: Uint8Array | object, accept: string): Promise<Response> {
+    const { baseUrl } = await this.connection.load();
+    if (!baseUrl) throw new ApiError(0, "not_connected", "No server is connected yet.");
+
+    const token = await this.tokens.load();
+    const raw = body instanceof Uint8Array;
+    const headers: Record<string, string> = {
+      Accept: accept,
+      "Content-Type": raw ? "audio/wav" : "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}${DESKTOP_API}${path}`, {
+        method: "POST",
+        headers,
+        // a copy: what arrives over IPC may sit on a shared buffer, which fetch will not take
+        body: raw ? body.slice() : JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT),
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError(0, "unreachable", "The server could not be reached.");
+    }
+
+    if (!response.ok) {
+      const { code, message } = errorOf(await response.json().catch(() => null));
+      if (response.status === 401) await this.signedOut();
+      throw new ApiError(response.status, code ?? "error", message ?? `The server answered ${response.status}.`);
+    }
+    return response;
+  }
+
+  /** A GET whose answer is a file -- a project file opened or saved through the server. */
+  async bytes(path: string): Promise<FileBytes> {
+    const { baseUrl } = await this.connection.load();
+    if (!baseUrl) throw new ApiError(0, "not_connected", "No server is connected yet.");
+
+    const token = await this.tokens.load();
+    const headers: Record<string, string> = { Accept: "*/*" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}${DESKTOP_API}${path}`, {
+        headers,
+        signal: AbortSignal.timeout(FILE_TIMEOUT),
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError(0, "unreachable", "The server could not be reached.");
+    }
+
+    if (!response.ok) {
+      const { code, message } = errorOf(await response.json().catch(() => null));
+      if (response.status === 401) await this.signedOut();
+      throw new ApiError(response.status, code ?? "error", message ?? `The server answered ${response.status}.`);
+    }
+    return {
+      data: new Uint8Array(await response.arrayBuffer()),
+      contentType: response.headers.get("content-type") ?? "application/octet-stream",
+    };
   }
 
   /** Any 401 means this app is not signed in -- with a token the server refused, or with

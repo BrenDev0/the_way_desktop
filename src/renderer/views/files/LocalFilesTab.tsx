@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactElement } from "react";
 import type { ProjectRef } from "../../../core/tools/ports";
 import type { LocalEntry } from "../../../core/workspace/localFiles";
-import { errorText, formatSize, nameOf, parentOf, plural, type Notice } from "./helpers";
+import type { ViewRequest } from "./FileChips";
+import { errorText, formatSize, nameOf, parentOf, pipe, plural, type Notice } from "./helpers";
 
 interface Props {
   folder: string | null;
@@ -14,6 +15,8 @@ interface Props {
   /** Where "Descargar" in the project tab should write: the selected folder here. */
   onTargetChange(folder: string): void;
   onUploaded(project: ProjectRef): void;
+  /** Opens a file in the viewer. */
+  onView?(request: ViewRequest): void;
 }
 
 type Editing = { mode: "rename"; path: string; value: string } | { mode: "create"; parent: string; value: string } | null;
@@ -21,7 +24,7 @@ type Editing = { mode: "rename"; path: string; value: string } | { mode: "create
 const DRAG_TYPE = "application/x-theway-path";
 
 /** The open folder as a tree. Everything happens here first; the server only sees what is uploaded. */
-export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, onChooseFolder, onTargetChange, onUploaded }: Props) {
+export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, onChooseFolder, onTargetChange, onUploaded, onView }: Props) {
   const [children, setChildren] = useState<Map<string, LocalEntry[]>>(new Map());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<LocalEntry | null>(null);
@@ -233,11 +236,11 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
   function rows(path: string, depth: number): ReactElement[] {
     const list = children.get(path) ?? [];
     const out: ReactElement[] = [];
-    if (editing?.mode === "create" && editing.parent === path) out.push(<li key="__new">{nameInput(editing.value, depth)}</li>);
+    if (editing?.mode === "create" && editing.parent === path) out.push(<li key="__new" {...pipe(depth)}>{nameInput(editing.value, depth)}</li>);
     for (const entry of list) {
       const open = expanded.has(entry.path);
       out.push(
-        <li key={entry.path}>
+        <li key={entry.path} {...pipe(depth)}>
           {editing?.mode === "rename" && editing.path === entry.path ? nameInput(editing.value, depth) : (
             <button
               type="button"
@@ -255,7 +258,10 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
                 setConfirmDelete(false);
                 if (entry.isDirectory) void toggle(entry);
               }}
-              onDoubleClick={() => beginEdit({ mode: "rename", path: entry.path, value: entry.name })}
+              // a file opens; a folder (and F2 or ✎ for anything) renames
+              onDoubleClick={() => (!entry.isDirectory && onView
+                ? onView({ source: "local", path: entry.path })
+                : beginEdit({ mode: "rename", path: entry.path, value: entry.name }))}
               title={entry.path}
             >
               <span className="tree__icon" aria-hidden="true">{entry.isDirectory ? (open ? "▾" : "▸") : "◻"}</span>
@@ -286,6 +292,17 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
     <div className="files__body" onKeyDown={onKeyDown}>
       <div className="files__toolbar" role="toolbar" aria-label="Acciones de archivos">
         <button type="button" className="ghost-button" onClick={startCreate} disabled={busy}>+ CARPETA</button>
+        {onView && (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={!selected || selected.isDirectory}
+            onClick={() => selected && !selected.isDirectory && onView({ source: "local", path: selected.path })}
+            title="Ver el archivo (o doble clic)"
+          >
+            ◉ VER
+          </button>
+        )}
         <button type="button" className="ghost-button ghost-button--icon" disabled={busy || !selected} onClick={() => selected && beginEdit({ mode: "rename", path: selected.path, value: selected.name })} title="Renombrar (F2)" aria-label="Renombrar">✎</button>
         <button type="button" className="ghost-button ghost-button--icon ghost-button--danger" disabled={busy || !selected} onClick={() => setConfirmDelete(true)} title="Eliminar (Supr)" aria-label="Eliminar">✕</button>
         <button type="button" className="ghost-button ghost-button--icon" disabled={busy} onClick={() => void act(() => window.desktop.files.reveal(selected?.path ?? ""))} title="Mostrar en el explorador" aria-label="Mostrar en el explorador">↗</button>

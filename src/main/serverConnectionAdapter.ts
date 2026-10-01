@@ -6,19 +6,40 @@ interface SavedConnection {
   baseUrl: string;
 }
 
+/**
+ * "localhost" as 127.0.0.1. Node resolves the name to both the IPv6 and IPv4 loopback and
+ * races connections between them, and on Windows with Docker some of those hang until they
+ * time out: a backend on this machine answered most calls at once but left a few hanging
+ * 30 seconds (the projects list at startup, say). The address itself never does that.
+ */
+export function directLoopback(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl);
+    if (url.hostname !== "localhost") return baseUrl;
+    url.hostname = "127.0.0.1";
+    return url.origin;
+  } catch {
+    return baseUrl;
+  }
+}
+
 export class ServerConnectionAdapter implements ServerConnectionPort {
   private readonly configPath: string;
 
   /** With a built-in server, every call targets it and addresses from the renderer are ignored. */
-  constructor(userDataDirectory: string, private readonly builtInUrl: string | null = null) {
+  private readonly builtInUrl: string | null;
+
+  constructor(userDataDirectory: string, builtInUrl: string | null = null) {
     this.configPath = join(userDataDirectory, "connection.json");
+    this.builtInUrl = builtInUrl ? directLoopback(builtInUrl) : null;
   }
 
   async load(): Promise<ServerSettings> {
     if (this.builtInUrl) return { baseUrl: this.builtInUrl, locked: true };
     try {
       const saved = JSON.parse(await readFile(this.configPath, "utf8")) as SavedConnection;
-      return { baseUrl: typeof saved.baseUrl === "string" ? saved.baseUrl : null, locked: false };
+      // an address saved before this was done still gets the direct route
+      return { baseUrl: typeof saved.baseUrl === "string" ? directLoopback(saved.baseUrl) : null, locked: false };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return { baseUrl: null, locked: false };
       throw error;
@@ -54,7 +75,7 @@ export class ServerConnectionAdapter implements ServerConnectionPort {
       };
     }
 
-    const normalized = url.origin;
+    const normalized = directLoopback(url.origin);
     try {
       const response = await fetch(`${normalized}/health`, {
         signal: AbortSignal.timeout(5000),

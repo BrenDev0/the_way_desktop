@@ -3,10 +3,18 @@
  * Canonical copy: front_end_the_way/src/app/theme.css. The desktop app keeps a copy in
  * src/renderer/theme.css; update it with `npm run theme:sync` there (`theme:check` fails on drift).
  *
+ * Themes are chosen with data-theme on <html>:
+ *   (default) dark  - neon green and magenta on near-black: the brand at its loudest.
+ *   light           - the same two hues, deepened until they read on white, with soft
+ *                     shadows where the dark theme glows. Same brand, daylight.
+ *
  * Effect levels are chosen with data-effects on <html>:
  *   (default) full  - the desktop app: strong scanlines and neon glow everywhere.
  *   calm            - the management panel (and a future desktop "reduce effects" setting):
  *                     faint scanlines, glow only where --glow-accent is used.
+ *
+ * Tints of a token are mixed from it (color-mix) rather than written out as rgba, so they
+ * follow the theme: a 6% wash of --accent is pale neon on dark and pale forest on light.
  */
 :root {
   /* Brand */
@@ -15,14 +23,24 @@
   --accent-deep: #005f00;
   --magenta: #ff00ff;
   --magenta-dim: #b4009e;
+  /* Text on a solid --accent fill (a hovered button, a selection). */
+  --on-accent: #000;
 
   /* Surfaces */
   --bg: #060a0e;
+  --bg-glow: #14353d40;
+  --bg-glow-2: transparent;
+  /* A pattern laid over the background (a background-image), or none. */
+  --bg-grid: none;
   --panel: #0c1319;
   --panel-raised: #111d25;
+  --panel-sunk: #090f15;
   --field: #060c12;
   --border: #385545;
   --border-dim: #24333e;
+  /* Hover and stripe washes are this, a few percent strong: light on dark, dark on light. */
+  --tint: #fff;
+  --shadow: #000000b0;
 
   /* Text and status */
   --text: #b9c9d1;
@@ -31,6 +49,14 @@
   --placeholder: #71818d;
   --warn: #f2c46d;
   --error: #ff7890;
+
+  /* The logo's five rows, brightest on top. */
+  --logo-1: #00ff00;
+  --logo-2: #00d700;
+  --logo-3: #00af00;
+  --logo-4: #008700;
+  --logo-5: #005f00;
+  --logo-glow: drop-shadow(0 0 3px rgba(0, 255, 0, 0.45));
 
   --radius: 7px;
 
@@ -48,8 +74,61 @@
   color-scheme: dark;
 }
 
+[data-theme="light"] {
+  /* Pure #00ff00 on white is 1.4:1 -- unreadable. These keep the hue and reach 4.5:1+. */
+  --accent: #00852a;
+  --accent-dim: #3f9d58;
+  --accent-deep: #9fd3ae;
+  --magenta: #b0009e;
+  --magenta-dim: #dd8fd4;
+  --on-accent: #fff;
+
+  /* Not white: a sage phosphor grey, panels just off it, the files column a shade deeper,
+     a green glow in one corner and a magenta one in the other, and a faint dot grid. */
+  --bg: #d9e3db;
+  --bg-glow: #00c21f30;
+  --bg-glow-2: #b0009e1c;
+  --bg-grid: radial-gradient(circle, #00852a26 1px, transparent 1.5px);
+  --panel: #f1f5f1;
+  --panel-raised: #e7eee8;
+  --panel-sunk: #d1dcd3;
+  --field: #f8fbf8;
+  --border: #86aa92;
+  --border-dim: #b9cbbf;
+  --tint: #000;
+  --shadow: #12301e38;
+
+  --text: #24343b;
+  --text-bright: #0a1417;
+  --muted: #526670;
+  --placeholder: #7f8f98;
+  --warn: #9a6200;
+  --error: #c4203d;
+
+  /* Neon still, but deep enough to hold its shape on white. */
+  --logo-1: #00c21f;
+  --logo-2: #00ab1c;
+  --logo-3: #009419;
+  --logo-4: #007c15;
+  --logo-5: #005f10;
+  --logo-glow: drop-shadow(0 0 2px rgba(0, 194, 31, 0.5));
+
+  /* Neon glow only blurs on a light ground; a soft coloured halo keeps the lit look. */
+  --scanlines: 0.06;
+  --glow: 0 0 5px rgba(0, 133, 42, 0.22);
+  --glow-magenta: 0 0 5px rgba(176, 0, 158, 0.22);
+  --glow-accent: 0 0 6px rgba(0, 133, 42, 0.3);
+
+  color-scheme: light;
+}
+
 [data-effects="calm"] {
   --scanlines: 0.07;
   --glow: none;
   --glow-magenta: none;
+}
+
+[data-theme="light"][data-effects="calm"] {
+  --scanlines: 0.02;
+  --bg-grid: none;
 }

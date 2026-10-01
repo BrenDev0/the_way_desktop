@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import type { ProjectRef, RemoteTree } from "../../../core/tools/ports";
 import { ProjectTree, type RemoteEntry } from "../../../core/workspace/remoteTree";
-import { errorText, formatSize, plural, type Notice } from "./helpers";
+import type { ViewRequest } from "./FileChips";
+import { errorText, formatSize, pipe, plural, type Notice } from "./helpers";
 
 /** A project folder to show, e.g. where a task delivered its work. */
 export interface RemoteFocus {
@@ -19,12 +20,18 @@ interface Props {
   focus: RemoteFocus | null;
   onProjectsChanged(): Promise<void>;
   onDownloaded(): void;
+  /** Opens a file in the viewer. */
+  onView?(request: ViewRequest): void;
+  /** Where the agent works now, when it is on the server: marked EN USO in the tree. */
+  workingRemote?: { project: string; path: string } | null;
+  /** Makes the selected project or folder where the agent works. */
+  onWorkHere?(project: string, path: string): Promise<void>;
 }
 
 type Selection = { project: ProjectRef; entry: RemoteEntry | null } | null;
 
 /** Every project on the server as one tree: projects at the top, their folders below. */
-export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focus, onProjectsChanged, onDownloaded }: Props) {
+export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focus, onProjectsChanged, onDownloaded, onView, workingRemote, onWorkHere }: Props) {
   const [trees, setTrees] = useState<Map<string, ProjectTree>>(new Map());
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
@@ -123,12 +130,29 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
     });
   }
 
+  /** Whether this project ("" path) or folder is where the agent works now. */
+  const inUse = (project: ProjectRef, path: string) =>
+    !!workingRemote && workingRemote.project.toLowerCase() === project.name.toLowerCase() && workingRemote.path === path;
+
+  // the selected project, or a folder in one -- a file is not a place to work in
+  const workable = selected && (!selected.entry || selected.entry.kind === "folder")
+    ? { project: selected.project.name, path: selected.entry?.path ?? "" }
+    : null;
+
+  async function workHere() {
+    if (!workable || !onWorkHere) return;
+    await act(async () => {
+      await onWorkHere(workable.project, workable.path);
+      setNotice({ error: false, text: `El agente trabaja ahora en ${workable.path ? `${workable.project}/${workable.path}` : workable.project}.` });
+    });
+  }
+
   function entries(project: ProjectRef, tree: ProjectTree, parentId: string | null, depth: number): ReactElement[] {
     return tree.children(parentId).map((entry) => {
       const open = entry.kind === "folder" && openFolders.has(entry.id);
       const pending = entry.kind === "file" && entry.file.status !== "ready";
       return (
-        <li key={entry.id}>
+        <li key={entry.id} {...pipe(depth)}>
           <button
             type="button"
             className={selected?.entry?.id === entry.id ? "tree__row tree__row--selected" : "tree__row"}
@@ -146,10 +170,14 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
                 });
               }
             }}
+            onDoubleClick={() => {
+              if (entry.kind === "file" && !pending) onView?.({ source: "project", project: project.name, path: entry.path });
+            }}
           >
             <span className="tree__icon" aria-hidden="true">{entry.kind === "folder" ? (open ? "▾" : "▸") : "◻"}</span>
             <span className="tree__name">{entry.name}{entry.kind === "folder" ? "/" : ""}</span>
             {entry.kind === "file" && <span className="tree__meta">{pending ? "subiendo…" : formatSize(entry.file.sizeBytes)}</span>}
+            {entry.kind === "folder" && inUse(project, entry.path) && <span className="tree__badge">EN USO</span>}
           </button>
           {open && <ul>{entries(project, tree, entry.id, depth + 1)}</ul>}
         </li>
@@ -158,11 +186,34 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
   }
 
   const what = !selected ? null : selected.entry ? `"${selected.entry.name}"` : `todo ${selected.project.name}`;
+  const viewable = selected?.entry?.kind === "file" && selected.entry.file.status === "ready";
 
   return (
     <div className="files__body">
       <div className="files__toolbar" role="toolbar" aria-label="Acciones del servidor">
         <button type="button" className="ghost-button" onClick={() => setCreating("")} disabled={busy}>+ PROYECTO</button>
+        {onWorkHere && (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={busy || !workable || inUse(selected!.project, workable.path)}
+            onClick={() => void workHere()}
+            title={workable ? `Que el agente trabaje en ${workable.path ? `${workable.project}/${workable.path}` : workable.project}` : "Selecciona un proyecto o una carpeta"}
+          >
+            ◆ TRABAJAR AQUÍ
+          </button>
+        )}
+        {onView && (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={!viewable}
+            onClick={() => viewable && selected?.entry && onView({ source: "project", project: selected.project.name, path: selected.entry.path })}
+            title="Ver el archivo (o doble clic)"
+          >
+            ◉ VER
+          </button>
+        )}
         <button type="button" className="ghost-button" disabled={busy || !selected || !folder} onClick={() => void download()} title={folder ? "Descargar a la carpeta local seleccionada" : "Elige primero una carpeta de trabajo"}>
           ↓ DESCARGAR
         </button>
@@ -187,7 +238,7 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
         </div>
       )}
 
-      <div className="tree">
+      <div className="tree tree--remote">
         <ul>
           {creating !== null && (
             <li>
@@ -221,6 +272,7 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
                 >
                   <span className="tree__icon" aria-hidden="true">{open ? "▾" : "▸"}</span>
                   <span className="tree__name">▣ {project.name}</span>
+                  {inUse(project, "") && <span className="tree__badge">EN USO</span>}
                 </button>
                 {open && (
                   !tree ? <p className="files__hint tree__loading">Cargando…</p>

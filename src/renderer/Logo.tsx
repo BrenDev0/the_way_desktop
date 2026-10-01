@@ -7,7 +7,8 @@ const GLYPHS: Record<string, string[]> = {
   Y: ["█   █", " █ █ ", "  █  ", "  █  ", "  █  "],
 };
 
-const ROW_COLORS = ["#00ff00", "#00d700", "#00af00", "#008700", "#005f00"];
+// From the theme, so the light one can deepen the neon until it holds on white.
+const ROW_COLORS = ["var(--logo-1)", "var(--logo-2)", "var(--logo-3)", "var(--logo-4)", "var(--logo-5)"];
 const GLYPH_WIDTH = 5;
 const LETTER_GAP = 1;
 const WORD_GAP = 3;
@@ -50,7 +51,7 @@ export function Logo({ text = "THE WAY" }: { text?: string }) {
           y={y + INSET}
           width={PIXEL}
           height={PIXEL}
-          fill={ROW_COLORS[y]}
+          style={{ fill: ROW_COLORS[y] }}
         />
       ))}
     </svg>

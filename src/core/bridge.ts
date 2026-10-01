@@ -17,6 +17,8 @@ export interface ApprovalPrompt {
   id: string;
   call: PendingToolCall;
   preview?: string;
+  /** A background task asking, by its description; absent for the chat's own calls. */
+  origin?: string;
 }
 
 export interface ToolCheck {
@@ -25,6 +27,31 @@ export interface ToolCheck {
 }
 
 export type Unsubscribe = () => void;
+
+/** Where the user works: a folder on this computer, or one in a project on the server. */
+export interface WorkingPlace {
+  mode: "local" | "remote";
+  /** The folder open on this computer (the local tools' fence), whichever side is in use. */
+  local: string | null;
+  remote: { project: string; path: string } | null;
+}
+
+/** A file brought in to look at: from one of the user's projects, or the open folder. */
+export interface ViewedFile {
+  name: string;
+  /** Project name, for a project file; absent for a local one. */
+  project?: string;
+  path: string;
+  contentType: string;
+  data: Uint8Array;
+}
+
+/** What to open in the viewer -- a file, or a folder for the files panel. */
+export interface ViewTarget {
+  project: string;
+  path: string;
+  kind: "file" | "folder";
+}
 
 export interface TextEvent {
   conversationId: string;
@@ -37,8 +64,23 @@ export interface ActivityEvent {
   tool?: ToolActivity;
 }
 
+/** What the user picked: a theme, or whatever Windows is set to. */
+export type ThemeChoice = "dark" | "light" | "system";
+
+export interface Appearance {
+  theme: ThemeChoice;
+  /** The theme in effect -- "system" settled to one of the two. */
+  resolved: "dark" | "light";
+}
+
 export interface DesktopBridge {
   connection: ServerConnectionPort;
+  appearance: {
+    get(): Promise<Appearance>;
+    set(theme: ThemeChoice): Promise<Appearance>;
+    /** Every window hears it: the user chose another, or Windows switched under "system". */
+    onChange(listener: (appearance: Appearance) => void): Unsubscribe;
+  };
   auth: {
     state(): Promise<AuthState>;
     login(email: string, password: string): Promise<AuthState>;
@@ -49,13 +91,20 @@ export interface DesktopBridge {
     /** The folder the local file tools work in, or null before one is chosen. */
     current(): Promise<string | null>;
     choose(): Promise<string | null>;
+    /** Where the user works now, local or remote. */
+    place(): Promise<WorkingPlace>;
+    /** A project folder on the server becomes where they work ("" is its top level). */
+    setRemote(project: string, path: string): Promise<WorkingPlace>;
+    /** Switch back to a side already chosen. */
+    use(mode: "local" | "remote"): Promise<WorkingPlace>;
   };
   conversations: {
     list(): Promise<Conversation[]>;
     create(title: string): Promise<Conversation>;
     messages(conversationId: string): Promise<ChatMessage[]>;
-    /** Resolves when the turn is over; progress arrives through onUpdate meanwhile. */
-    send(conversationId: string, message: string): Promise<Conversation>;
+    /** Resolves when the turn is over; progress arrives through onUpdate meanwhile.
+     *  `voice`: the reply will be spoken, so it should be written to be heard. */
+    send(conversationId: string, message: string, voice?: boolean): Promise<Conversation>;
     /** Picks up a conversation left mid-turn. */
     resume(conversationId: string): Promise<Conversation>;
     remove(conversationId: string): Promise<void>;
@@ -68,9 +117,64 @@ export interface DesktopBridge {
   approvals: {
     onRequest(listener: (prompt: ApprovalPrompt) => void): Unsubscribe;
     respond(id: string, decision: ApprovalDecision): Promise<void>;
+    /** Questions answered without the window (auto mode switched on): take them down. */
+    onSettled(listener: (ids: string[]) => void): Unsubscribe;
+    /** Auto mode: approve everything except calls that must always ask (images). */
+    auto(): Promise<boolean>;
+    setAuto(on: boolean): Promise<boolean>;
+    onAutoChanged(listener: (on: boolean) => void): Unsubscribe;
   };
   tools: {
     check(): Promise<ToolCheck>;
+  };
+  /** Looking at what the agent made: fetch a file, save a copy, or hand it to the system. */
+  viewer: {
+    project(projectName: string, path: string): Promise<ViewedFile>;
+    local(path: string): Promise<ViewedFile>;
+    /** Asks where to save it; resolves with where it went, or null if cancelled. */
+    save(name: string, data: Uint8Array): Promise<string | null>;
+    /** Opens it in the program the system uses for that kind of file. */
+    openExternal(name: string, data: Uint8Array): Promise<void>;
+    /** The task strip asked to show something; the window opens it. */
+    onShow(listener: (target: ViewTarget) => void): Unsubscribe;
+  };
+  /** A link from a reply, opened in the system browser (http, https and mailto only). */
+  links: {
+    open(url: string): Promise<void>;
+  };
+  /** Speech through the server, on the user's OpenAI key. */
+  voice: {
+    /** A 16 kHz mono wav recording, as text; empty when nothing was said. */
+    transcribe(wav: Uint8Array): Promise<string>;
+    /** The text spoken, as raw 16-bit mono pcm at 24 kHz. */
+    speak(text: string): Promise<Uint8Array>;
+  };
+  /**
+   * The task icons on the screen edge. The dock window uses the first group; the main
+   * window only hears what the dock asks it to open.
+   */
+  dock: {
+    /** The docked tasks, oldest first. */
+    tasks(): Promise<TaskView[]>;
+    onTasks(listener: (tasks: TaskView[]) => void): Unsubscribe;
+    /** Puts a finished task's icon away. */
+    dismiss(taskId: string): Promise<void>;
+    /** Whether the pointer is over an icon or card: the rest of the strip lets clicks
+     *  through to whatever is behind it. */
+    interactive(on: boolean): void;
+    /** Brings the app forward on a task's delivered folder, or its conversation. */
+    openProject(name: string, path: string | null): void;
+    openConversation(conversationId: string): void;
+    /** Brings the app forward on the approval a task waits on, asking again if it was closed. */
+    review(): void;
+    /** Brings the app forward showing one of the task's files. */
+    show(target: ViewTarget): void;
+    /** Answers what a task waits on, right from the strip: one decision for each call. */
+    approve(taskId: string, decisions: { callId: string; approved: boolean; args?: Record<string, string> }[]): Promise<void>;
+    /** A small picture of an image the task made, for its tile. */
+    thumbnail(project: string, path: string): Promise<{ data: Uint8Array; contentType: string } | null>;
+    onOpenProject(listener: (target: { name: string; path: string | null }) => void): Unsubscribe;
+    onOpenConversation(listener: (conversationId: string) => void): Unsubscribe;
   };
   /** The user's background tasks, with the tool calls seen while the app watched them. */
   tasks: {
@@ -104,12 +208,18 @@ export interface DesktopBridge {
 
 /** IPC channel names, in one place so the preload and the handlers cannot drift. */
 export const CHANNELS = {
+  appearanceGet: "appearance:get",
+  appearanceSet: "appearance:set",
+  appearanceChanged: "appearance:changed",
   authState: "auth:state",
   authLogin: "auth:login",
   authLogout: "auth:logout",
   authSignedOut: "auth:signed-out",
   workspaceCurrent: "workspace:current",
   workspaceChoose: "workspace:choose",
+  workspacePlace: "workspace:place",
+  workspaceSetRemote: "workspace:set-remote",
+  workspaceUse: "workspace:use",
   conversationsList: "conversations:list",
   conversationsCreate: "conversations:create",
   conversationsMessages: "conversations:messages",
@@ -121,7 +231,28 @@ export const CHANNELS = {
   conversationsActivity: "conversations:activity",
   approvalsRequest: "approvals:request",
   approvalsRespond: "approvals:respond",
+  approvalsSettled: "approvals:settled",
+  approvalsAuto: "approvals:auto",
+  approvalsSetAuto: "approvals:set-auto",
+  approvalsAutoChanged: "approvals:auto-changed",
   toolsCheck: "tools:check",
+  voiceTranscribe: "voice:transcribe",
+  voiceSpeak: "voice:speak",
+  dockTasks: "dock:tasks",
+  dockTasksChanged: "dock:tasks-changed",
+  dockDismiss: "dock:dismiss",
+  dockInteractive: "dock:interactive",
+  dockOpenProject: "dock:open-project",
+  dockOpenConversation: "dock:open-conversation",
+  dockReview: "dock:review",
+  dockApprove: "dock:approve",
+  dockThumbnail: "dock:thumbnail",
+  linksOpen: "links:open",
+  viewerShow: "viewer:show",
+  viewerProject: "viewer:project",
+  viewerLocal: "viewer:local",
+  viewerSave: "viewer:save",
+  viewerOpenExternal: "viewer:open-external",
   tasksList: "tasks:list",
   tasksChanged: "tasks:changed",
   filesList: "files:list",

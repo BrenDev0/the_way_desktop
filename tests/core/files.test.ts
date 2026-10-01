@@ -154,6 +154,22 @@ describe("CopyPath, MovePath and the delete tools", () => {
     expect(fs.files.has("draft.md")).toBe(false);
   });
 
+  it("renames a file or folder where it is", async () => {
+    const { run, fs } = tools({ "docs/draft.md": "text", "docs/old/a.txt": "x" });
+    expect(await run("RenamePath", { path: "docs/draft.md", new_name: "final.md" })).toBe("Renamed docs/draft.md to docs/final.md");
+    await run("RenamePath", { path: "docs/old", new_name: "archive" });
+    expect(fs.text("docs/final.md")).toBe("text");
+    expect(fs.text("docs/archive/a.txt")).toBe("x");
+    expect(fs.files.has("docs/draft.md")).toBe(false);
+  });
+
+  it("will not rename onto a name that is taken, or to a path", async () => {
+    const { run, fs } = tools({ "a.md": "a", "b.md": "b" });
+    await expect(run("RenamePath", { path: "a.md", new_name: "b.md" })).rejects.toThrow(/already exists/);
+    await expect(run("RenamePath", { path: "a.md", new_name: "sub/b.md" })).rejects.toThrow(/plain name/);
+    expect(fs.text("b.md")).toBe("b");
+  });
+
   it("refuses to move or delete the open folder itself", async () => {
     const { run } = tools({ "a.txt": "x" });
     await expect(run("MovePath", { source: ".", destination: "elsewhere" })).rejects.toThrow(/open folder/);

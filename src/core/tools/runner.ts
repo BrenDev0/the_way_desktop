@@ -5,12 +5,20 @@ export interface ApprovalRequest {
   call: PendingToolCall;
   /** Extra detail to show: the diff an edit would make, the message being sent. */
   preview?: string;
+  /** Who is asking, when it is not the chat in front of the user: a background task. */
+  origin?: string;
+  /** The run the call belongs to -- one chat reply. One image approval covers the run. */
+  run?: string;
 }
 
 export interface ApprovalDecision {
   approved: boolean;
   /** Why not, or what to do instead -- the model is told to follow it. */
   feedback?: string;
+  /** What the approver picked among the call's choices (the image model, say). */
+  args?: Record<string, string>;
+  /** Nobody answered -- the window closed. Not a refusal: a task can ask again later. */
+  dismissed?: boolean;
 }
 
 /** Asks the person at the keyboard. The main process forwards this to the window. */
@@ -45,17 +53,17 @@ export class ToolRunner {
     return serverTools.filter((name) => !this.implements(name));
   }
 
-  async resolveAll(calls: readonly PendingToolCall[]): Promise<ToolResolution[]> {
+  async resolveAll(calls: readonly PendingToolCall[], run?: string): Promise<ToolResolution[]> {
     const resolutions: ToolResolution[] = [];
-    for (const call of calls) resolutions.push(await this.resolve(call));
+    for (const call of calls) resolutions.push(await this.resolve(call, run));
     return resolutions;
   }
 
-  async resolve(call: PendingToolCall): Promise<ToolResolution> {
+  async resolve(call: PendingToolCall, run?: string): Promise<ToolResolution> {
     const handler = this.tools[call.name];
 
     if (call.location === "server") {
-      const decision = await this.approvals.request({ call });
+      const decision = await this.approvals.request({ call, preview: call.preview ?? undefined, run });
       return this.decided(call, decision);
     }
 
@@ -70,7 +78,7 @@ export class ToolRunner {
 
     if (call.requiresApproval || REQUIRES_APPROVAL.has(call.name)) {
       const preview = await handler.preview?.(call.args).catch(() => undefined);
-      const decision = await this.approvals.request({ call, preview });
+      const decision = await this.approvals.request({ call, preview, run });
       if (!decision.approved) return this.decided(call, decision);
     }
 
@@ -82,10 +90,17 @@ export class ToolRunner {
   }
 
   private decided(call: PendingToolCall, decision: ApprovalDecision): ToolResolution {
-    const resolution: ToolResolution = { toolCallId: call.id, approved: decision.approved };
-    if (decision.feedback?.trim()) resolution.feedback = decision.feedback.trim();
-    return resolution;
+    return decidedResolution(call, decision);
   }
+}
+
+/** A decision as the server takes it: picks only for the choices the call offers. */
+export function decidedResolution(call: PendingToolCall, decision: ApprovalDecision): ToolResolution {
+  const resolution: ToolResolution = { toolCallId: call.id, approved: decision.approved };
+  if (decision.feedback?.trim()) resolution.feedback = decision.feedback.trim();
+  const picks = Object.entries(decision.args ?? {}).filter(([name, value]) => call.choices?.[name]?.includes(value));
+  if (decision.approved && picks.length) resolution.args = Object.fromEntries(picks);
+  return resolution;
 }
 
 export function describe(error: unknown): string {

@@ -30,6 +30,13 @@ export interface TurnOptions {
    *  keep-alive every 15 seconds, so this is three missed in a row. */
   silenceMilliseconds?: number;
   sleep?: (milliseconds: number) => Promise<void>;
+  /** The folder open in the app now, or null. Read afresh for every message and resume,
+   *  and told to the server, so the agent knows where its local tools work -- the user
+   *  can open one, or switch, between any two messages. */
+  folder?: () => Promise<string | null>;
+  /** The project folder on the server the user works in ("project/folder"), when that is
+   *  the side in use; null when it is the local folder. Takes the local folder's place. */
+  remote?: () => Promise<string | null>;
 }
 
 const RETRY_LIMIT_MS = 10_000;
@@ -63,6 +70,20 @@ export class TurnService {
   ) {
     this.silence = options.silenceMilliseconds ?? 45_000;
     this.sleep = options.sleep ?? defaultSleep;
+    this.folder = options.folder;
+    this.remote = options.remote;
+  }
+
+  private readonly folder: (() => Promise<string | null>) | undefined;
+  private readonly remote: (() => Promise<string | null>) | undefined;
+
+  /** Where the user works, for a request body: `{ remoteFolder }` when it is a project
+   *  folder on the server, else `{ localFolder }` -- the open folder, "" for none. */
+  private async where(): Promise<{ localFolder?: string; remoteFolder?: string }> {
+    const remote = await this.remote?.().catch(() => null);
+    if (remote) return { remoteFolder: remote };
+    if (!this.folder) return {};
+    return { localFolder: (await this.folder().catch(() => null)) ?? "" };
   }
 
   list(): Promise<Conversation[]> {
@@ -81,9 +102,19 @@ export class TurnService {
     return this.api.request("DELETE", `/conversations/${conversationId}`);
   }
 
-  async send(conversationId: string, message: string): Promise<Conversation> {
-    const started = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/messages`, { message });
+  /** `voice`: the reply will be spoken aloud, so the server asks for one written to be heard. */
+  async send(conversationId: string, message: string, voice = false): Promise<Conversation> {
+    const started = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/messages`, {
+      message,
+      ...(voice ? { voice: true } : {}),
+      ...(await this.where()),
+    });
     this.events.update(started);
+    // the server keeps no record of it, so every resume of this turn has to say it again
+    // a new message is a new run: whatever the last reply was allowed does not carry over
+    this.runs.set(conversationId, `${conversationId}:${++this.sent}`);
+    if (voice) this.voice.add(conversationId);
+    else this.voice.delete(conversationId);
     return this.drive(conversationId);
   }
 
@@ -198,7 +229,10 @@ export class TurnService {
     // seen again, the same answers are sent again -- never a second delete, never the same
     // approval asked twice.
     const unsettled = paused.pendingToolCalls.filter((call) => !this.settled.has(call.id));
-    for (const resolution of await this.runner.resolveAll(unsettled)) {
+    // a turn picked up after a restart is a run of its own
+    const run = this.runs.get(conversationId) ?? `${conversationId}:${++this.sent}`;
+    this.runs.set(conversationId, run);
+    for (const resolution of await this.runner.resolveAll(unsettled, run)) {
       this.settled.set(resolution.toolCallId, resolution);
     }
     const resolutions = paused.pendingToolCalls.map((call) => this.settled.get(call.id)!);
@@ -206,6 +240,8 @@ export class TurnService {
     try {
       const resumed = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/tool-results`, {
         resolutions,
+        ...(this.voice.has(conversationId) ? { voice: true } : {}),
+        ...(await this.where()),
       });
       this.events.update(resumed);
     } catch (error) {
@@ -220,4 +256,9 @@ export class TurnService {
   }
 
   private readonly settled = new Map<string, ToolResolution>();
+  /** Conversations whose current turn was spoken. */
+  private readonly voice = new Set<string>();
+  /** The run each conversation is on: one per message sent. */
+  private readonly runs = new Map<string, string>();
+  private sent = 0;
 }

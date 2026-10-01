@@ -14,6 +14,7 @@ export const FILE_TOOLS = [
   "UpdateFile",
   "CopyPath",
   "MovePath",
+  "RenamePath",
   "DeleteFile",
   "DeleteDir",
 ] as const;
@@ -37,6 +38,7 @@ export const BROWSER_TOOLS = [
 export const REQUIRES_APPROVAL: ReadonlySet<string> = new Set([
   "UpdateFile",
   "MovePath",
+  "RenamePath",
   "DeleteFile",
   "DeleteDir",
   "UploadToProject",

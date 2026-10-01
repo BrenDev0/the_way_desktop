@@ -289,6 +289,26 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     return `Moved ${shown(source)} to ${shown(target)} (${bytes(info.size)} bytes)`;
   }
 
+  async function renamePath(args: ToolArgs): Promise<string> {
+    const source = fs.normalize(text(args, "path"));
+    const name = text(args, "new_name").trim();
+    if (!name || name === "." || name === ".." || /[\\/<>:"|?*]/.test(name)) {
+      throw new ToolError("new_name must be a plain name, not a path. To move it elsewhere, use MovePath.");
+    }
+    if (source === "") throw new ToolError("Refusing to rename the open folder itself");
+    const info = await fs.stat(source);
+    if (!info.exists) throw new ToolError(`Nothing to rename at: ${shown(source)}`);
+
+    const target = fs.normalize([...source.split("/").slice(0, -1), name].join("/"));
+    if (target === source) return `${shown(source)} already has that name`;
+    // a case-only rename finds the source itself there on Windows, which is fine
+    if ((await fs.stat(target)).exists && target.toLowerCase() !== source.toLowerCase()) {
+      throw new ToolError(`'${shown(target)}' already exists. Pick another name or ask the user.`);
+    }
+    await fs.move(source, target);
+    return `Renamed ${shown(source)} to ${shown(target)}`;
+  }
+
   async function deleteFile(args: ToolArgs): Promise<string> {
     const path = fs.normalize(text(args, "file_path"));
     const info = await fs.stat(path);
@@ -335,6 +355,7 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     },
     CopyPath: { run: copyPath },
     MovePath: { run: movePath },
+    RenamePath: { run: renamePath },
     DeleteFile: { run: deleteFile },
     DeleteDir: { run: deleteDir },
   };

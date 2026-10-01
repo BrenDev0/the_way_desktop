@@ -12,8 +12,18 @@
  * turn's own stream and from here) changes nothing.
  */
 
-import { ApiError, type BackgroundTask, type ConversationEventsPort, type ServerApiPort, type TaskEvent, type ToolActivity } from "../api";
+import {
+  ApiError,
+  type BackgroundTask,
+  type ConversationEventsPort,
+  type PendingToolCall,
+  type ServerApiPort,
+  type TaskEvent,
+  type ToolActivity,
+  type ToolResolution,
+} from "../api";
 import type { SseEvent } from "../sse";
+import { decidedResolution, type ApprovalPort } from "../tools/runner";
 
 export interface TaskStep {
   id: string;
@@ -33,6 +43,8 @@ export interface TaskMonitorEvents {
   changed(tasks: TaskView[]): void;
   /** A task seen running has just ended. Not called for tasks that were already over. */
   finished?(task: TaskView): void;
+  /** A task has stopped to ask the user something; the monitor is asking them now. */
+  needsApproval?(task: TaskView): void;
 }
 
 export interface TaskMonitorOptions {
@@ -41,7 +53,13 @@ export interface TaskMonitorOptions {
   sleep?: (milliseconds: number) => Promise<void>;
   /** Most tasks kept for the column; the newest win. */
   limit?: number;
+  /** Where a task that stops for the user's approval asks them. Without it, nobody is
+   *  asked and the task waits (up to the server's 7 days) for an app that can. */
+  approvals?: ApprovalPort;
 }
+
+/** Still under way, from the user's side: working, or waiting for them to answer. */
+const live = (task: { status: TaskView["status"] }) => task.status === "running" || task.status === "needs_approval";
 
 const MAX_STEPS = 300;
 const RETRY_LIMIT_MS = 10_000;
@@ -54,12 +72,15 @@ export class TaskMonitor {
   private readonly tasks = new Map<string, TaskView>();
   private readonly following = new Map<string, AbortController>();
   private readonly announced = new Set<string>();
+  // tasks whose question is on screen now -- asked once, however many times it is heard
+  private readonly asking = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private stopped = false;
   private readonly silence: number;
   private readonly refreshEvery: number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly limit: number;
+  private readonly approvals: ApprovalPort | undefined;
 
   constructor(
     private readonly api: ServerApiPort,
@@ -71,11 +92,12 @@ export class TaskMonitor {
     this.refreshEvery = options.refreshMilliseconds ?? 20_000;
     this.sleep = options.sleep ?? defaultSleep;
     this.limit = options.limit ?? 50;
+    this.approvals = options.approvals;
   }
 
   /** Running first (newest first), then the rest by when they last changed. */
   list(): TaskView[] {
-    const running = (task: TaskView) => (task.status === "running" ? 0 : 1);
+    const running = (task: TaskView) => (live(task) ? 0 : 1);
     return [...this.tasks.values()]
       .sort((a, b) => running(a) - running(b) || b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, this.limit)
@@ -88,11 +110,53 @@ export class TaskMonitor {
     const fetched = await this.api.request<BackgroundTask[]>("GET", "/background-tasks");
     for (const task of fetched) this.merge(task);
     for (const task of fetched) {
-      if (task.status === "running" && task.conversationId) this.follow(task.conversationId);
+      if (live(task) && task.conversationId) this.follow(task.conversationId);
     }
     this.schedule();
     this.emit();
+    for (const task of fetched) if (task.status === "needs_approval") this.ask(task.id);
     return this.list();
+  }
+
+  /** Answers what a task stopped to ask; it carries on on the server from where it stopped. */
+  async approve(taskId: string, resolutions: ToolResolution[]): Promise<void> {
+    const resumed = await this.api.request<BackgroundTask>("POST", `/background-tasks/${taskId}/approvals`, {
+      resolutions,
+    });
+    this.merge(resumed);
+    if (resumed.conversationId) this.follow(resumed.conversationId);
+    this.schedule();
+    this.emit();
+  }
+
+  /**
+   * Puts a waiting task's question to the user -- every call it waits on, one at a time,
+   * with the same dialog the chat uses -- and sends the answers. A question closed
+   * unanswered (the window went away) is not a refusal: it is asked again later.
+   */
+  private ask(taskId: string): void {
+    const task = this.tasks.get(taskId);
+    const pending = task?.pendingApproval ?? [];
+    if (!this.approvals || !task || task.status !== "needs_approval" || !pending.length || this.asking.has(taskId)) return;
+    this.asking.add(taskId);
+    this.events.needsApproval?.({ ...task, steps: [...task.steps] });
+
+    void (async () => {
+      try {
+        const resolutions: ToolResolution[] = [];
+        for (const call of pending) {
+          const decision = await this.approvals!.request({ call, preview: call.preview ?? undefined, origin: task.description });
+          if (decision.dismissed) return;
+          resolutions.push(decidedResolution(call, decision));
+        }
+        await this.approve(taskId, resolutions);
+      } catch {
+        // answered elsewhere, or expired: the list says where it stands now
+        void this.refresh().catch(() => {});
+      } finally {
+        this.asking.delete(taskId);
+      }
+    })();
   }
 
   /** A task event the turn's own stream saw; `eventId` is where to carry on after the turn. */
@@ -113,6 +177,7 @@ export class TaskMonitor {
     this.following.clear();
     this.tasks.clear();
     this.announced.clear();
+    this.asking.clear();
   }
 
   private follow(conversationId: string, lastEventId?: string): void {
@@ -173,6 +238,17 @@ export class TaskMonitor {
       this.applyTask(conversationId, { ...data, state: event.type === "task.started" ? "started" : "finished" });
       return false; // applyTask emits itself
     }
+    if (event.type === "task.needs_approval") {
+      const data = JSON.parse(event.data) as { taskId: string; pendingApproval: PendingToolCall[] };
+      const task = this.tasks.get(data.taskId);
+      if (!task) return false;
+      task.status = "needs_approval";
+      task.pendingApproval = data.pendingApproval;
+      task.updatedAt = new Date().toISOString();
+      this.emit();
+      this.ask(task.id);
+      return false;
+    }
     return false;
   }
 
@@ -194,7 +270,9 @@ export class TaskMonitor {
     task.description = event.description || task.description;
     task.updatedAt = now;
     if (event.state === "started") {
+      // also how a task answered after waiting on the user is seen carrying on
       task.status = "running";
+      task.pendingApproval = [];
       this.announced.add(task.id);
     } else {
       task.status = event.status === "failed" ? "failed" : "done";
@@ -235,12 +313,12 @@ export class TaskMonitor {
 
   private merge(fresh: BackgroundTask): void {
     const known = this.tasks.get(fresh.id);
-    const wasRunning = known?.status === "running";
+    const wasLive = known !== undefined && live(known);
     // A read that left before the task ended can land after its task.finished: keep the end.
-    if (known && !wasRunning && fresh.status === "running") return;
+    if (known && !wasLive && live(fresh)) return;
     this.tasks.set(fresh.id, { ...fresh, steps: known?.steps ?? [] });
-    if (fresh.status === "running") this.announced.add(fresh.id);
-    else if (wasRunning) this.announce(this.tasks.get(fresh.id)!);
+    if (live(fresh)) this.announced.add(fresh.id);
+    else if (wasLive) this.announce(this.tasks.get(fresh.id)!);
   }
 
   private announce(task: TaskView): void {
@@ -250,7 +328,7 @@ export class TaskMonitor {
 
   private hasRunning(conversationId: string): boolean {
     for (const task of this.tasks.values()) {
-      if (task.conversationId === conversationId && task.status === "running") return true;
+      if (task.conversationId === conversationId && live(task)) return true;
     }
     return false;
   }
@@ -259,7 +337,7 @@ export class TaskMonitor {
   // task with no conversation to stream from, still lands.
   private schedule(): void {
     clearTimeout(this.timer);
-    if (this.stopped || ![...this.tasks.values()].some((task) => task.status === "running")) return;
+    if (this.stopped || ![...this.tasks.values()].some(live)) return;
     this.timer = setTimeout(() => void this.refresh().catch(() => this.schedule()), this.refreshEvery);
   }
 
