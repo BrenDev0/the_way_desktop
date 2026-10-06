@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { AuthState } from "../core/auth";
-import type { ChatMessage, Conversation } from "../core/api";
+import type { Attachment, ChatMessage, Conversation } from "../core/api";
 import {
   CHANNELS,
   type ActivityEvent,
@@ -30,6 +30,8 @@ function listen<T>(channel: string, listener: (payload: T) => void): Unsubscribe
   return () => ipcRenderer.removeListener(channel, handler);
 }
 
+let speeches = 0;
+
 const desktop: DesktopBridge = {
   connection,
   appearance: {
@@ -54,8 +56,11 @@ const desktop: DesktopBridge = {
     list: () => ipcRenderer.invoke(CHANNELS.conversationsList) as Promise<Conversation[]>,
     create: (title) => ipcRenderer.invoke(CHANNELS.conversationsCreate, title) as Promise<Conversation>,
     messages: (id) => ipcRenderer.invoke(CHANNELS.conversationsMessages, id) as Promise<ChatMessage[]>,
-    send: (id, message, voice) => ipcRenderer.invoke(CHANNELS.conversationsSend, id, message, voice === true) as Promise<Conversation>,
+    send: (id, message, voice, attachments) =>
+      ipcRenderer.invoke(CHANNELS.conversationsSend, id, message, voice === true, attachments ?? []) as Promise<Conversation>,
+    attach: (name, contentType, data) => ipcRenderer.invoke(CHANNELS.conversationsAttach, name, contentType, data) as Promise<Attachment>,
     resume: (id) => ipcRenderer.invoke(CHANNELS.conversationsResume, id) as Promise<Conversation>,
+    retry: (id) => ipcRenderer.invoke(CHANNELS.conversationsRetry, id) as Promise<Conversation>,
     remove: (id) => ipcRenderer.invoke(CHANNELS.conversationsRemove, id) as Promise<void>,
     onUpdate: (listener) => listen<Conversation>(CHANNELS.conversationsUpdate, listener),
     onText: (listener) => listen<TextEvent>(CHANNELS.conversationsText, listener),
@@ -85,7 +90,20 @@ const desktop: DesktopBridge = {
   },
   voice: {
     transcribe: (wav) => ipcRenderer.invoke(CHANNELS.voiceTranscribe, wav) as Promise<string>,
-    speak: (text) => ipcRenderer.invoke(CHANNELS.voiceSpeak, text) as Promise<Uint8Array>,
+    // The audio comes back as events tagged with this call's id, piece by piece, while the
+    // call itself resolves once the last piece is in.
+    speak: async (text, chunk) => {
+      const stream = `${Date.now()}-${++speeches}`;
+      const off = listen<{ stream: string; pcm: Uint8Array }>(CHANNELS.voiceChunk, (piece) => {
+        if (piece.stream === stream) chunk(piece.pcm);
+      });
+      try {
+        await ipcRenderer.invoke(CHANNELS.voiceSpeak, text, stream);
+      } finally {
+        off();
+      }
+    },
+    warm: () => ipcRenderer.invoke(CHANNELS.voiceWarm) as Promise<void>,
   },
   dock: {
     tasks: () => ipcRenderer.invoke(CHANNELS.dockTasks),

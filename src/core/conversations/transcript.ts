@@ -4,7 +4,7 @@
  * Tool results are separate "tool" messages on the server, matched here by toolCallId.
  */
 
-import type { ChatMessage } from "../api";
+import type { Attachment, ChatMessage } from "../api";
 
 export interface ToolActivity {
   id: string;
@@ -18,6 +18,26 @@ export interface TranscriptItem {
   role: "user" | "assistant";
   text: string;
   tools: ToolActivity[];
+  /** Files the user attached to this message. */
+  attachments: Attachment[];
+}
+
+/** The files a message carries. The server stores them as typed blocks beside the text,
+ *  in its own (snake_case) shape, since message content is kept as it was sent. */
+export function attachmentsOf(content: unknown): Attachment[] {
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((block): Attachment[] => {
+    if (typeof block !== "object" || !block || (block as { type?: unknown }).type !== "attachment") return [];
+    const raw = block as Record<string, unknown>;
+    return [{
+      fileId: String(raw.file_id ?? raw.fileId ?? ""),
+      project: String(raw.project ?? ""),
+      path: String(raw.path ?? ""),
+      name: String(raw.name ?? ""),
+      contentType: String(raw.content_type ?? raw.contentType ?? ""),
+      sizeBytes: Number(raw.size_bytes ?? raw.sizeBytes ?? 0),
+    }];
+  });
 }
 
 /** Text from a message: OpenAI sends a string, Anthropic a list of typed blocks. */
@@ -48,7 +68,8 @@ export function transcript(messages: ChatMessage[]): TranscriptItem[] {
       args: call.args ?? {},
       result: results.get(call.id) ?? null,
     }));
-    if (!text && !tools.length) continue;
+    const attachments = message.role === "user" ? attachmentsOf(message.content) : [];
+    if (!text && !tools.length && !attachments.length) continue;
 
     // Tool-only steps join the assistant turn they belong to, so one reply reads as one block.
     const last = items[items.length - 1];
@@ -57,7 +78,7 @@ export function transcript(messages: ChatMessage[]): TranscriptItem[] {
       if (text) last.text = text;
       continue;
     }
-    items.push({ role: message.role, text, tools });
+    items.push({ role: message.role, text, tools, attachments });
   }
   return items;
 }

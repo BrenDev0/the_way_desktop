@@ -44,6 +44,9 @@ export function useVoice({ onTranscript }: Options) {
     const opened = await opening.current;
     mic.current = opened;
     setOn(true);
+    // the first spoken sentence would otherwise pay the connection setup to the speech
+    // service; best effort -- a voice key problem shows up when it is actually used
+    void window.desktop.voice.warm().catch(() => {});
     return opened;
   }, []);
 
@@ -154,7 +157,7 @@ export function useVoice({ onTranscript }: Options) {
     silence();
     if (!mic.current) return;
     speaker.current = new Speaker(
-      (text) => window.desktop.voice.speak(text),
+      (text, chunk) => window.desktop.voice.speak(text, chunk),
       setSpeaking,
       (reason) => setError(voiceError(reason)),
     );

@@ -32,18 +32,43 @@ export interface PendingToolCall {
   alwaysAsk?: boolean;
 }
 
-export type ConversationStatus = "idle" | "running" | "awaiting_client" | "failed";
+export type ConversationStatus = "idle" | "running" | "awaiting_client" | "paused" | "failed";
+
+export type PauseReason = "rate_limit" | "quota" | "timeout" | "provider_error" | "credentials" | "interrupted";
+
+/** Why a turn stopped short. Everything it did is kept; resuming carries on from there. */
+export interface TurnPause {
+  reason: PauseReason;
+  /** What the provider said, when it said something -- worth showing for quota and keys. */
+  detail: string;
+  pausedAt: string | null;
+  /** Retrying before this is likely to pause again; null when the provider did not say. */
+  retryAfter: string | null;
+}
 
 export interface Conversation {
   id: string;
   title: string;
   client: "desktop" | "web";
   status: ConversationStatus;
+  /** Set while status is "paused". */
+  pause?: TurnPause | null;
   pendingToolCalls: PendingToolCall[];
   iterationsUsed: number;
   totalTokens: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A file attached to a message: uploaded into the user's drafts project, where the
+ *  agent works with it by its path. */
+export interface Attachment {
+  fileId: string;
+  project: string;
+  path: string;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
 }
 
 export interface ChatMessage {

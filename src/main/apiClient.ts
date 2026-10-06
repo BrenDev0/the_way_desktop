@@ -85,8 +85,11 @@ export class ApiClient implements ServerApiPort {
    * A POST whose body or answer is not JSON: a recording going up, spoken audio coming
    * back. Same address, token and sign-out handling as request(); errors still arrive as
    * the server's JSON.
+   *
+   * `signal` replaces the 30-second deadline, for an answer read as it streams: a fixed
+   * deadline also covers reading the body, and cut long spoken audio off partway.
    */
-  async binary(path: string, body: Uint8Array | object, accept: string): Promise<Response> {
+  async binary(path: string, body: Uint8Array | object, accept: string, signal?: AbortSignal): Promise<Response> {
     const { baseUrl } = await this.connection.load();
     if (!baseUrl) throw new ApiError(0, "not_connected", "No server is connected yet.");
 
@@ -105,7 +108,7 @@ export class ApiClient implements ServerApiPort {
         headers,
         // a copy: what arrives over IPC may sit on a shared buffer, which fetch will not take
         body: raw ? body.slice() : JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT),
+        signal: signal ?? AbortSignal.timeout(TIMEOUT),
         cache: "no-store",
       });
     } catch {

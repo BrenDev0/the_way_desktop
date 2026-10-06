@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { AuthService } from "../core/auth";
 import { CHANNELS } from "../core/bridge";
 import { ConnectionService } from "../core/connectionService";
+import type { Conversation } from "../core/api";
+import { pauseText } from "../core/conversations/pause";
 import { TurnService } from "../core/conversations/turnService";
 import { TaskMonitor, type TaskView } from "../core/tasks/taskMonitor";
 import { desktopTools } from "../core/tools";
@@ -133,6 +135,31 @@ function notifyNeedsApproval(task: TaskView) {
   notice.show();
 }
 
+/** Pauses already told about: a stream reopened on a paused turn says so again. */
+const pausesTold = new Set<string>();
+
+/** A turn paused (rate limit, quota, timeout...) while the operator looks elsewhere. The
+ *  banner with REANUDAR is already in the window; this gets them there. */
+function notifyPaused(conversation: Conversation) {
+  if (conversation.status !== "paused") return;
+  const key = `${conversation.id}:${conversation.pause?.pausedAt ?? ""}`;
+  if (pausesTold.has(key)) return;
+  pausesTold.add(key);
+  if (!mainWindow || mainWindow.isFocused()) return;
+  mainWindow.flashFrame(true);
+  mainWindow.once("focus", () => mainWindow?.flashFrame(false));
+  if (!Notification.isSupported()) return;
+  const { title, body } = pauseText(conversation.pause);
+  const notice = new Notification({ title: `${title} · ${conversation.title}`, body });
+  notice.on("click", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  notice.show();
+}
+
 /** The signed-in half of the app: the server API, the conversation loop and the tools. */
 function createServices(connection: ServerConnectionAdapter): AppServices {
   const userData = app.getPath("userData");
@@ -198,7 +225,10 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     return projects.content(found.id, file.id);
   };
   const turns = new TurnService(api, events, runner, {
-    update: (conversation) => send(CHANNELS.conversationsUpdate, conversation),
+    update: (conversation) => {
+      send(CHANNELS.conversationsUpdate, conversation);
+      notifyPaused(conversation);
+    },
     text: (conversationId, text) => send(CHANNELS.conversationsText, { conversationId, text }),
     message: (conversationId, message) => send(CHANNELS.conversationsActivity, { conversationId, message }),
     activity: (conversationId, tool) => {

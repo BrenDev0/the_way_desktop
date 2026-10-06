@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
-import type { ChatMessage, Conversation, DesktopUser } from "../../core/api";
+import type { Attachment, ChatMessage, Conversation, DesktopUser, TurnPause } from "../../core/api";
+import { pauseText, retryHint } from "../../core/conversations/pause";
 import type { ApprovalPrompt, ThemeChoice, WorkingPlace } from "../../core/bridge";
 import { useAppearance } from "../appearance";
 import { Logo } from "../Logo";
@@ -10,7 +11,7 @@ import { ConversationPicker } from "./chat/ConversationPicker";
 import { WorkPlacePicker } from "./chat/WorkPlacePicker";
 import { Markdown } from "./chat/Markdown";
 import { ToolCard, type OpenTarget } from "./chat/ToolCard";
-import type { ViewRequest } from "./files/FileChips";
+import { FileChips, type ViewRequest } from "./files/FileChips";
 import { FileViewer } from "./files/FileViewer";
 import { FilesPanel, type FilesTab } from "./files/FilesPanel";
 import type { RemoteFocus } from "./files/RemoteFilesTab";
@@ -30,6 +31,7 @@ const STATUS: Record<Conversation["status"], string> = {
   idle: "LISTO",
   running: "EL AGENTE ESTÁ TRABAJANDO...",
   awaiting_client: "ESPERANDO ESTE EQUIPO",
+  paused: "TURNO EN PAUSA",
   failed: "EL ÚLTIMO TURNO FALLÓ",
 };
 
@@ -85,6 +87,12 @@ export function Workbench({ user, connected, onSignOut }: Props) {
     void window.desktop.approvals.auto().then(setAutoOn).catch(() => {});
     return window.desktop.approvals.onAutoChanged(setAutoOn);
   }, []);
+  // files attached to the message being written, uploading or ready to send
+  const [attached, setAttached] = useState<PendingAttachment[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
+  const uploading = attached.some((item) => item.status === "uploading");
+  const readyFiles = attached.flatMap((item) => (item.status === "ready" && item.attachment ? [item.attachment] : []));
   const closeViewer = useCallback(() => setViewing(null), []);
   const composer = useRef<HTMLFormElement>(null);
   // bumped when a turn ends: the agent may have written to the folder
@@ -294,9 +302,42 @@ export function Workbench({ user, connected, onSignOut }: Props) {
     await submit(draft.trim(), false);
   }
 
-  /** Sends a line, typed or spoken. With voice on, the reply is spoken as it is written. */
+  /** Files picked, dropped or pasted: each starts uploading to the server at once, so it
+   *  is ready by the time the message is. */
+  function addFiles(files: File[]) {
+    const room = MAX_ATTACHMENTS - attached.length;
+    if (files.length > room) setError(`Puedes adjuntar hasta ${MAX_ATTACHMENTS} archivos por mensaje.`);
+    for (const file of files.slice(0, Math.max(0, room))) {
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const name = attachmentName(file);
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setAttached((current) => [...current, { key, name, status: "failed", error: "Supera los 25 MB" }]);
+        continue;
+      }
+      setAttached((current) => [...current, { key, name, status: "uploading" }]);
+      void file
+        .arrayBuffer()
+        .then((buffer) => window.desktop.conversations.attach(name, file.type || guessType(name), new Uint8Array(buffer)))
+        .then((attachment) => setAttached((current) => current.map((item) => (item.key === key ? { ...item, status: "ready", attachment } : item))))
+        .catch(() => setAttached((current) => current.map((item) => (item.key === key ? { ...item, status: "failed", error: "No se pudo subir" } : item))));
+    }
+  }
+
+  function removeAttached(key: string) {
+    setAttached((current) => current.filter((item) => item.key !== key));
+  }
+
+  /** Sends a line, typed or spoken, with whatever files are attached. With voice on, the
+   *  reply is spoken as it is written. */
   async function submit(text: string, spoken: boolean) {
-    if (!text) return;
+    const files = readyFiles;
+    if (!text && !files.length) return;
+    if (uploading) {
+      // the message is about those files: it waits for them rather than going without
+      if (spoken) setDraft((current) => (current.trim() ? `${current.trimEnd()} ${text}` : text));
+      setError("Espera a que terminen de subir los archivos adjuntos.");
+      return;
+    }
     // busy with a reply the user asked for, or one the agent started itself (a finished
     // background task being reported): the next message waits in the box until it ends
     if (sending || serverTurn) {
@@ -307,7 +348,9 @@ export function Workbench({ user, connected, onSignOut }: Props) {
 
     let id = activeId;
     if (!id) {
-      const created = await window.desktop.conversations.create(text.slice(0, 60));
+      // the placeholder, not the message: the server names a conversation after its first
+      // exchange only while it still has one, and the new title arrives with the reply
+      const created = await window.desktop.conversations.create("Nueva conversación");
       id = created.id;
       setActiveId(id);
       await refreshList();
@@ -318,18 +361,45 @@ export function Workbench({ user, connected, onSignOut }: Props) {
     setLive("");
     setSending(true);
     setError(null);
-    setMessages((current) => [...current, { role: "user", content: text }]);
+    setMessages((current) => [...current, { role: "user", content: files.length ? withAttachments(text, files) : text }]);
+    // the files go with this message; a failed send puts them back to try again
+    const sentItems = attached.filter((item) => item.status === "ready");
+    setAttached((current) => current.filter((item) => item.status !== "ready"));
     // clicking ENVIAR moved the cursor onto the button; it belongs back in the box
     refocus();
     voice.beginReply();
     try {
-      const finished = await window.desktop.conversations.send(id, text, voice.on);
+      const finished = await window.desktop.conversations.send(id, text, voice.on, files.map((file) => file.fileId));
+      setStatus(finished);
+      if (finished.status === "failed") setError("El agente no pudo terminar este turno.");
+    } catch (reason) {
+      setError(sendError(reason));
+      setAttached((current) => [...sentItems, ...current]);
+    } finally {
+      voice.endReply();
+      setSending(false);
+      refocus();
+      await refreshMessages(id).catch(() => {});
+      void refreshList().catch(() => {});
+      afterTurn();
+    }
+  }
+
+  /** REANUDAR on a paused turn: the server carries on from its last step, and this follows
+   *  it to its end like a sent message. It may pause again (the limit has not lifted yet). */
+  async function retry() {
+    const id = activeRef.current;
+    if (!id || sending) return;
+    setLive("");
+    setSending(true);
+    setError(null);
+    try {
+      const finished = await window.desktop.conversations.retry(id);
       setStatus(finished);
       if (finished.status === "failed") setError("El agente no pudo terminar este turno.");
     } catch (reason) {
       setError(sendError(reason));
     } finally {
-      voice.endReply();
       setSending(false);
       refocus();
       await refreshMessages(id).catch(() => {});
@@ -452,7 +522,26 @@ export function Workbench({ user, connected, onSignOut }: Props) {
         </div>
       </div>
 
-      <section className="chat" aria-label="Conversación">
+      <section
+        className={dragging ? "chat chat--dragging" : "chat"}
+        aria-label="Conversación"
+        // files dropped anywhere on the chat are attached to the message being written
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(event) => {
+          if (!event.dataTransfer.files.length) return;
+          event.preventDefault();
+          setDragging(false);
+          addFiles(Array.from(event.dataTransfer.files));
+          refocus();
+        }}
+      >
         {autoOn && (
           <p className="chat__notice chat__notice--auto" role="status">
             MODO AUTO · el agente modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes.
@@ -477,6 +566,12 @@ export function Workbench({ user, connected, onSignOut }: Props) {
                 </div>
               )}
               {item.text && (item.role === "assistant" ? <Markdown text={item.text} /> : <p className="selectable">{item.text}</p>)}
+              {item.attachments.length > 0 && (
+                <FileChips
+                  files={item.attachments.map((file) => ({ project: file.project, path: file.path, kind: "file" as const }))}
+                  onOpen={openFile}
+                />
+              )}
             </article>
           ))}
           {live && (
@@ -492,6 +587,8 @@ export function Workbench({ user, connected, onSignOut }: Props) {
           )}
           <div ref={bottom} />
         </div>
+
+        {status?.status === "paused" && !sending && <PauseBanner pause={status.pause} onRetry={() => void retry()} />}
 
         <div className="chat__status" role="status" aria-live="polite">
           {sending && <span className="topbar__pulse" />}
@@ -544,7 +641,29 @@ export function Workbench({ user, connected, onSignOut }: Props) {
             <button type="button" className="ghost-button chat__toggle chat__toggle--files" onClick={() => setOverlay((o) => (o === "files" ? null : "files"))} aria-pressed={overlay === "files"}>◧ ARCHIVOS</button>
           </span>
         </div>
+        {attached.length > 0 && <AttachmentTray items={attached} onRemove={removeAttached} />}
         <form ref={composer} className="chat__composer" onSubmit={send}>
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            onChange={(event) => {
+              addFiles(Array.from(event.target.files ?? []));
+              // the same file can be picked again after being removed
+              event.target.value = "";
+              refocus();
+            }}
+          />
+          <button
+            type="button"
+            className="ghost-button chat__attach"
+            onClick={() => picker.current?.click()}
+            title="Adjuntar una imagen, un PDF u otro archivo (también puedes arrastrarlos aquí o pegar una imagen)"
+            aria-label="Adjuntar archivos"
+          >
+            ＋
+          </button>
           {/* Never disabled: a disabled box loses the cursor, and the next message can be
               written while the agent is still on this one -- it is sent once the turn ends. */}
           <textarea
@@ -552,6 +671,13 @@ export function Workbench({ user, connected, onSignOut }: Props) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKey}
+            onPaste={(event) => {
+              // a screenshot pasted into the box is attached, not lost
+              const files = Array.from(event.clipboardData.files);
+              if (!files.length) return;
+              event.preventDefault();
+              addFiles(files);
+            }}
             placeholder={sending
               ? "El agente está trabajando… puedes ir escribiendo el siguiente mensaje"
               : "Escribe un mensaje…  (Shift+Enter: nueva línea · mantén Ctrl+M para hablar)"}
@@ -582,7 +708,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
           <button
             type="submit"
             className="chat__send"
-            disabled={sending || serverTurn || !draft.trim()}
+            disabled={sending || serverTurn || uploading || (!draft.trim() && !readyFiles.length)}
             aria-label="Enviar"
             title="Enviar (Enter)"
           >
@@ -612,6 +738,90 @@ function MicIcon() {
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
     </svg>
+  );
+}
+
+// The server's limits for files attached to one message (conversations/config.py).
+const MAX_ATTACHMENTS = 10;
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+/** A file attached to the message being written. */
+interface PendingAttachment {
+  key: string;
+  name: string;
+  status: "uploading" | "ready" | "failed";
+  attachment?: Attachment;
+  error?: string;
+}
+
+const TYPES: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+  pdf: "application/pdf", txt: "text/plain", md: "text/markdown", csv: "text/csv", json: "application/json",
+  html: "text/html", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+function guessType(name: string): string {
+  return TYPES[name.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+}
+
+/** A pasted screenshot arrives as "image.png"; it is given a name worth keeping. */
+function attachmentName(file: File): string {
+  if (file.name && file.name !== "image.png") return file.name;
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
+  return `captura-${stamp}.${file.type.split("/")[1] || "png"}`;
+}
+
+/** The message as the server stores it, so it shows with its files before it comes back. */
+function withAttachments(text: string, files: Attachment[]): unknown[] {
+  return [
+    ...(text ? [{ type: "text", text }] : []),
+    ...files.map((file) => ({
+      type: "attachment",
+      file_id: file.fileId,
+      project: file.project,
+      path: file.path,
+      name: file.name,
+      content_type: file.contentType,
+      size_bytes: file.sizeBytes,
+    })),
+  ];
+}
+
+/** The files going with the next message, above the box: each uploading, ready, or failed. */
+function AttachmentTray({ items, onRemove }: { items: PendingAttachment[]; onRemove(key: string): void }) {
+  return (
+    <ul className="chat__attachments" aria-label="Archivos adjuntos">
+      {items.map((item) => (
+        <li key={item.key} className={`chat__attachment chat__attachment--${item.status}`} title={item.error ?? item.name}>
+          <span className="chat__attachment-name">{item.name}</span>
+          <span className="chat__attachment-state">
+            {item.status === "uploading" ? "SUBIENDO…" : item.status === "failed" ? (item.error ?? "ERROR").toUpperCase() : "LISTO"}
+          </span>
+          <button type="button" onClick={() => onRemove(item.key)} aria-label={`Quitar ${item.name}`}>×</button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A paused turn: what happened, what to do, and the button that carries it on. Nothing
+ *  it did is lost -- the server resumes from its last step. */
+function PauseBanner({ pause, onRetry }: { pause: TurnPause | null | undefined; onRetry(): void }) {
+  const { title, body } = pauseText(pause);
+  const hint = retryHint(pause);
+  return (
+    <div className="chat__notice chat__pause" role="alert">
+      <div className="chat__pause-text">
+        <strong>{title}.</strong> {body} {hint}
+        {pause?.detail && (pause.reason === "quota" || pause.reason === "credentials") && (
+          <span className="chat__pause-detail selectable">{pause.detail}</span>
+        )}
+        <span className="chat__pause-safe">Todo lo que hizo el agente hasta aquí está guardado.</span>
+      </div>
+      <button type="button" className="chat__pause-retry" onClick={onRetry}>
+        REANUDAR
+      </button>
+    </div>
   );
 }
 

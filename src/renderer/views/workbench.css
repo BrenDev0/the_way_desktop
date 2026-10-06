@@ -115,6 +115,15 @@
 .chat__pending { color: var(--magenta); }
 .chat__error { margin-left: auto; color: var(--error); letter-spacing: .04em; }
 
+/* A paused turn (rate limit, quota, timeout...): what happened, and REANUDAR, by the box. */
+.chat__pause { display: flex; align-items: center; gap: 14px; margin: 0 20px 8px; }
+.chat__pause-text { flex: 1; min-width: 0; line-height: 1.5; }
+.chat__pause-text strong { color: var(--text-bright); }
+.chat__pause-detail { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.chat__pause-safe { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.chat__pause-retry { flex: none; padding: 6px 14px; border: 1px solid var(--warn); border-radius: 4px; background: transparent; color: var(--warn); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.chat__pause-retry:hover { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--text-bright); }
+
 /* Which conversation this is, by the box you type in (chat/ConversationPicker.tsx). */
 /* its own layer, above the chat log and status line it opens over */
 .chat__convo { position: relative; z-index: 20; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 20px 0; border-top: 1px solid var(--border-dim); }
@@ -174,6 +183,7 @@
 .convo__status { flex: none; color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: .1em; }
 .convo__status--running, .convo__status--awaiting_client { color: var(--accent); }
 .convo__status--failed { color: var(--error); }
+.convo__status--paused { color: var(--warn); }
 .convo__new { flex: none; width: 30px; padding: 0; border: 1px solid var(--border-dim); border-radius: 4px; background: transparent; color: var(--text); font: inherit; font-size: 16px; line-height: 1; }
 .convo__new:hover { border-color: var(--accent); color: var(--accent); text-shadow: var(--glow-accent); }
 
@@ -210,6 +220,21 @@
 .chat__send:focus-visible { outline: 1px dashed var(--accent); outline-offset: 3px; }
 
 .chat__voice-controls { display: flex; flex-direction: column; gap: 6px; }
+
+/* Files attached to the next message: the + by the box, the tray above it, and the chat
+   lit up while something is dragged over it. */
+.chat__attach { flex: none; align-self: flex-end; width: 40px; height: 40px; padding: 0; font-size: 20px; line-height: 1; }
+.chat__attachments { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 8px 20px 0; list-style: none; }
+.chat__attachment { display: inline-flex; align-items: center; gap: 8px; max-width: 280px; padding: 4px 6px 4px 10px; border: 1px solid color-mix(in srgb, var(--magenta) 35%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--magenta) 5%, transparent); font-size: 11px; }
+.chat__attachment-name { min-width: 0; overflow: hidden; color: var(--text-bright); text-overflow: ellipsis; white-space: nowrap; }
+.chat__attachment-state { flex: none; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.chat__attachment--uploading .chat__attachment-state { color: var(--accent); }
+.chat__attachment--failed { border-color: color-mix(in srgb, var(--error) 50%, transparent); }
+.chat__attachment--failed .chat__attachment-state { color: var(--error); }
+.chat__attachment button { flex: none; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: inherit; font-size: 14px; line-height: 1; }
+.chat__attachment button:hover { background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text-bright); }
+.chat--dragging { outline: 2px dashed var(--magenta); outline-offset: -6px; }
+.bubble--user .file-chips { padding: 8px 0 0; justify-content: flex-end; }
 .chat__mic { display: inline-flex; flex: 1; align-items: center; justify-content: center; gap: 6px; min-width: 112px; padding: 6px 10px; border: 1px solid var(--magenta-dim); border-radius: 4px; background: transparent; color: var(--magenta); font-size: 10px; font-weight: 700; letter-spacing: .12em; transition: background .15s, color .15s, box-shadow .15s; }
 .chat__mic:hover:not(:disabled) { border-color: var(--magenta); color: var(--text-bright); }
 .chat__mic:disabled { opacity: .4; cursor: not-allowed; }

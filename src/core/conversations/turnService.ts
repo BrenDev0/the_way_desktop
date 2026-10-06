@@ -102,10 +102,12 @@ export class TurnService {
     return this.api.request("DELETE", `/conversations/${conversationId}`);
   }
 
-  /** `voice`: the reply will be spoken aloud, so the server asks for one written to be heard. */
-  async send(conversationId: string, message: string, voice = false): Promise<Conversation> {
+  /** `voice`: the reply will be spoken aloud, so the server asks for one written to be heard.
+   *  `attachments`: ids of files already uploaded for this message (attach). */
+  async send(conversationId: string, message: string, voice = false, attachments: string[] = []): Promise<Conversation> {
     const started = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/messages`, {
       message,
+      ...(attachments.length ? { attachments } : {}),
       ...(voice ? { voice: true } : {}),
       ...(await this.where()),
     });
@@ -115,6 +117,22 @@ export class TurnService {
     this.runs.set(conversationId, `${conversationId}:${++this.sent}`);
     if (voice) this.voice.add(conversationId);
     else this.voice.delete(conversationId);
+    return this.drive(conversationId);
+  }
+
+  /** Carries on a paused turn from where it stopped (a rate limit, a timeout...), and
+   *  follows it. Whatever it did before the pause is kept on the server. */
+  async retry(conversationId: string): Promise<Conversation> {
+    try {
+      const resumed = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/resume`, {
+        ...(this.voice.has(conversationId) ? { voice: true } : {}),
+        ...(await this.where()),
+      });
+      this.events.update(resumed);
+    } catch (error) {
+      // Resumed already (another window, a click that did land): follow it all the same.
+      if (!(error instanceof ApiError && error.code === "conversation_not_paused")) throw error;
+    }
     return this.drive(conversationId);
   }
 
@@ -192,7 +210,10 @@ export class TurnService {
     if (event.type === "status") {
       const conversation = data as Conversation;
       this.events.update(conversation);
-      if (conversation.status === "idle" || conversation.status === "failed") return conversation;
+      // paused: the turn stopped short and waits on the user to resume it -- the end of this drive
+      if (conversation.status === "idle" || conversation.status === "failed" || conversation.status === "paused") {
+        return conversation;
+      }
       const pending = conversation.pendingToolCalls;
       if (conversation.status === "awaiting_client" && pending.length && pending.every((call) => !answered.has(call.id))) {
         return new Paused(conversation);

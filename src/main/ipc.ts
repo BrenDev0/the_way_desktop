@@ -76,6 +76,18 @@ function requirePath(value: unknown): string {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// The server's limits for files attached to a message (conversations/config.py).
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const MAX_ATTACHMENTS = 10;
+
+function requireIds(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > MAX_ATTACHMENTS || !value.every((id) => typeof id === "string" && UUID.test(id))) {
+    throw new Error("Invalid attachments");
+  }
+  return value as string[];
+}
+
 function requireId(value: unknown, what: string): string {
   if (typeof value !== "string" || !UUID.test(value)) throw new Error(`Invalid ${what}`);
   return value;
@@ -137,10 +149,19 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
   handle(CHANNELS.conversationsList, () => services.turns.list());
   handle(CHANNELS.conversationsCreate, (title) => services.turns.create(typeof title === "string" && title.trim() ? title.trim().slice(0, 200) : "Nueva conversación"));
   handle(CHANNELS.conversationsMessages, (id) => services.turns.messages(requireText(id, "conversation")));
-  handle(CHANNELS.conversationsSend, (id, message, voice) =>
-    services.turns.send(requireText(id, "conversation"), requireText(message, "message"), voice === true),
-  );
+  handle(CHANNELS.conversationsSend, (id, message, voice, attachments) => {
+    const files = requireIds(attachments);
+    // with files attached, a message may be just the files
+    const text = typeof message === "string" && (message.trim() || files.length) ? message : requireText(message, "message");
+    return services.turns.send(requireText(id, "conversation"), text, voice === true, files);
+  });
+  handle(CHANNELS.conversationsAttach, (name, contentType, data) => {
+    if (!(data instanceof Uint8Array) || data.byteLength > MAX_ATTACHMENT_BYTES) throw new Error("Invalid attachment");
+    const type = typeof contentType === "string" && /^[\w.+-]+\/[\w.+-]+$/.test(contentType) ? contentType : "application/octet-stream";
+    return services.projects.attach(safeName(name), data, type);
+  });
   handle(CHANNELS.conversationsResume, (id) => services.turns.drive(requireText(id, "conversation")));
+  handle(CHANNELS.conversationsRetry, (id) => services.turns.retry(requireText(id, "conversation")));
   handle(CHANNELS.conversationsRemove, async (id) => {
     await services.turns.remove(requireText(id, "conversation"));
   });
@@ -244,7 +265,14 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     if (!(wav instanceof Uint8Array) || wav.byteLength > MAX_RECORDING_BYTES) throw new Error("Invalid recording");
     return services.voice.transcribe(wav);
   });
-  handle(CHANNELS.voiceSpeak, (text) => services.voice.speak(requireText(text, "text").slice(0, MAX_SPEAK_CHARS)));
+  handle(CHANNELS.voiceSpeak, async (text, stream) => {
+    const id = requireText(stream, "stream").slice(0, 64);
+    // each piece goes to the window as it arrives, so it plays while the rest is synthesised
+    await services.voice.speak(requireText(text, "text").slice(0, MAX_SPEAK_CHARS), (pcm) => {
+      mainWindow()?.webContents.send(CHANNELS.voiceChunk, { stream: id, pcm });
+    });
+  });
+  handle(CHANNELS.voiceWarm, () => services.voice.warm());
 
   handle(CHANNELS.toolsCheck, async (): Promise<ToolCheck> => {
     const offered = await services.api.request<{ name: string }[]>("GET", "/desktop-tools");

@@ -5,6 +5,7 @@ const STATUS: Record<Conversation["status"], string> = {
   idle: "LISTA",
   running: "TRABAJANDO…",
   awaiting_client: "ESPERA A ESTE EQUIPO",
+  paused: "EN PAUSA",
   failed: "FALLÓ",
 };
 

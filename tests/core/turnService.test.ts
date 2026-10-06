@@ -117,6 +117,52 @@ describe("TurnService over the event stream", () => {
     expect(stream.opened).toEqual([undefined, "2-0"]);
   });
 
+  it("sends the ids of the files attached to the message", async () => {
+    const stream = new ScriptedStream([[status(conversation("idle"), "1-0")]]);
+    const { turns, api } = service(stream);
+
+    await turns.send("conv", "ponla en el pdf", false, ["f1", "f2"]);
+    await turns.send("conv", "sin archivos");
+
+    expect(api.posted[0].body).toMatchObject({ message: "ponla en el pdf", attachments: ["f1", "f2"] });
+    expect(api.posted[1].body).not.toHaveProperty("attachments");
+  });
+
+  it("ends the drive on a paused turn, with why", async () => {
+    const paused = { ...conversation("paused"), pause: { reason: "rate_limit" as const, detail: "", pausedAt: "x", retryAfter: null } };
+    const stream = new ScriptedStream([[status(conversation("running")), status(paused, "1-0")]]);
+    const { turns } = service(stream);
+
+    const finished = await turns.send("conv", "research this");
+
+    expect(finished.status).toBe("paused");
+    expect(finished.pause?.reason).toBe("rate_limit");
+    expect(stream.opened).toEqual([undefined]);
+  });
+
+  it("retries a paused turn on the server, then follows it to its end", async () => {
+    const stream = new ScriptedStream([[status(conversation("running")), status(conversation("idle"), "2-0")]]);
+    const { turns, api } = service(stream);
+
+    const finished = await turns.retry("conv");
+
+    expect(api.posted[0].path).toBe("/conversations/conv/resume");
+    expect(finished.status).toBe("idle");
+  });
+
+  it("follows the turn all the same when it was already resumed elsewhere", async () => {
+    const stream = new ScriptedStream([[status(conversation("idle"), "2-0")]]);
+    const api = new Api();
+    api.request = async () => {
+      throw new ApiError(409, "conversation_not_paused", "This conversation has no paused turn to resume");
+    };
+    const { turns } = service(stream, api);
+
+    const finished = await turns.retry("conv");
+
+    expect(finished.status).toBe("idle");
+  });
+
   it("tells the server which folder is open, read afresh for every message and resume", async () => {
     const stream = new ScriptedStream([
       [status(conversation("awaiting_client", [call()]), "1-0")],

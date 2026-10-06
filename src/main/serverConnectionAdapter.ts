@@ -23,6 +23,23 @@ export function directLoopback(baseUrl: string): string {
   }
 }
 
+/**
+ * The same, for a whole URL rather than a server's origin: a presigned bucket URL handed
+ * out by a backend on this machine (http://localhost:9090/...?Signature=...) hit the same
+ * hang -- an attachment's upload failed with ECONNRESET. Only "localhost" is touched, so a
+ * deployed bucket's URL, whose signature covers its host, goes out exactly as signed.
+ */
+export function loopbackUrl(href: string): string {
+  try {
+    const url = new URL(href);
+    if (url.hostname !== "localhost") return href;
+    url.hostname = "127.0.0.1";
+    return url.href;
+  } catch {
+    return href;
+  }
+}
+
 export class ServerConnectionAdapter implements ServerConnectionPort {
   private readonly configPath: string;
 

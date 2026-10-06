@@ -5,7 +5,7 @@
  */
 
 import type { AuthState } from "./auth";
-import type { ChatMessage, Conversation, PendingToolCall, ToolActivity } from "./api";
+import type { Attachment, ChatMessage, Conversation, PendingToolCall, ToolActivity } from "./api";
 import type { ServerConnectionPort } from "./connection";
 import type { TaskView } from "./tasks/taskMonitor";
 import type { ProjectRef, RemoteTree } from "./tools/ports";
@@ -104,9 +104,14 @@ export interface DesktopBridge {
     messages(conversationId: string): Promise<ChatMessage[]>;
     /** Resolves when the turn is over; progress arrives through onUpdate meanwhile.
      *  `voice`: the reply will be spoken, so it should be written to be heard. */
-    send(conversationId: string, message: string, voice?: boolean): Promise<Conversation>;
+    send(conversationId: string, message: string, voice?: boolean, attachments?: string[]): Promise<Conversation>;
+    /** Uploads a file to attach to the next message; send its fileId with it. */
+    attach(name: string, contentType: string, data: Uint8Array): Promise<Attachment>;
     /** Picks up a conversation left mid-turn. */
     resume(conversationId: string): Promise<Conversation>;
+    /** Carries on a paused turn (a rate limit, a timeout...) from where it stopped, and
+     *  resolves when it is over again. */
+    retry(conversationId: string): Promise<Conversation>;
     remove(conversationId: string): Promise<void>;
     onUpdate(listener: (conversation: Conversation) => void): Unsubscribe;
     /** The assistant's reply as it is written, a piece at a time. */
@@ -146,8 +151,11 @@ export interface DesktopBridge {
   voice: {
     /** A 16 kHz mono wav recording, as text; empty when nothing was said. */
     transcribe(wav: Uint8Array): Promise<string>;
-    /** The text spoken, as raw 16-bit mono pcm at 24 kHz. */
-    speak(text: string): Promise<Uint8Array>;
+    /** The text spoken, as raw 16-bit mono pcm at 24 kHz, handed to `chunk` as it streams
+     *  in; resolves once all of it has arrived. A chunk may end mid-sample. */
+    speak(text: string, chunk: (pcm: Uint8Array) => void): Promise<void>;
+    /** Voice was turned on: get the connection to the speech service ready. */
+    warm(): Promise<void>;
   };
   /**
    * The task icons on the screen edge. The dock window uses the first group; the main
@@ -224,7 +232,9 @@ export const CHANNELS = {
   conversationsCreate: "conversations:create",
   conversationsMessages: "conversations:messages",
   conversationsSend: "conversations:send",
+  conversationsAttach: "conversations:attach",
   conversationsResume: "conversations:resume",
+  conversationsRetry: "conversations:retry",
   conversationsRemove: "conversations:remove",
   conversationsUpdate: "conversations:update",
   conversationsText: "conversations:text",
@@ -238,6 +248,9 @@ export const CHANNELS = {
   toolsCheck: "tools:check",
   voiceTranscribe: "voice:transcribe",
   voiceSpeak: "voice:speak",
+  /** main -> window: a piece of the audio a voiceSpeak call is streaming, by its stream id */
+  voiceChunk: "voice:chunk",
+  voiceWarm: "voice:warm",
   dockTasks: "dock:tasks",
   dockTasksChanged: "dock:tasks-changed",
   dockDismiss: "dock:dismiss",
