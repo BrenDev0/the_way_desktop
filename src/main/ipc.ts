@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { app, dialog, ipcMain, shell, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
-import type { AuthService } from "../core/auth";
+import type { AuthService, AuthState } from "../core/auth";
 import { CHANNELS, type ToolCheck, type ViewedFile } from "../core/bridge";
 import type { ServerApiPort } from "../core/api";
 import type { TurnService } from "../core/conversations/turnService";
@@ -114,9 +114,21 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     });
   }
 
-  handle(CHANNELS.authState, () => services.auth.restore());
-  handle(CHANNELS.authLogin, (email, password) =>
-    services.auth.login(requireText(email, "email"), requireText(password, "password"), services.deviceName),
+  // Whoever is signed in takes over the remembered workspace. When it was another
+  // account's, it starts empty, and the window's cache goes too: it can hold the last
+  // account's images, fetched from links that need no sign-in.
+  const signedIn = async (state: AuthState): Promise<AuthState> => {
+    if (state.user && (await services.workspace.claim(state.user.id))) {
+      await mainWindow()?.webContents.session.clearCache();
+    }
+    return state;
+  };
+
+  handle(CHANNELS.authState, async () => signedIn(await services.auth.restore()));
+  handle(CHANNELS.authLogin, async (email, password) =>
+    signedIn(
+      await services.auth.login(requireText(email, "email"), requireText(password, "password"), services.deviceName),
+    ),
   );
   handle(CHANNELS.authLogout, () => {
     services.tasks.stop();
