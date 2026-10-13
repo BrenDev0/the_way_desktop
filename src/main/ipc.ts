@@ -10,6 +10,7 @@ import type { TaskMonitor } from "../core/tasks/taskMonitor";
 import { mustAsk, type AutoApprovals } from "../core/tools/autoApprovals";
 import type { ToolRunner } from "../core/tools/runner";
 import { contentTypeFor, downloadFromProject, findProjectFile, uploadToProject } from "../core/tools/transfer";
+import { updateFrom, type AppVersionAnswer } from "../core/update";
 import { LocalFilesError, type LocalFiles } from "../core/workspace/localFiles";
 import { operatorMessage } from "../core/workspace/messages";
 import type { NodeFileSystem } from "./nodeFileSystem";
@@ -229,6 +230,17 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     if (kind !== "file" && kind !== "folder") throw new Error("Invalid kind");
     return projects.removeEntry(requireId(projectId, "project"), kind, requireId(id, "entry"));
   }));
+
+  // Asked by the window on start and every few hours. Public on the server, so an expired
+  // session still hears about a new version; any failure is just "no update".
+  handle(CHANNELS.appUpdate, async () => {
+    try {
+      const answer = await services.api.request<AppVersionAnswer>("GET", "/app/version");
+      return updateFrom(answer, app.getVersion(), process.platform);
+    } catch {
+      return null;
+    }
+  });
 
   handle(CHANNELS.linksOpen, async (url) => {
     // checked here too: the window's word is not trusted for what the system opens

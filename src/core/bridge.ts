@@ -11,6 +11,7 @@ import type { TaskView } from "./tasks/taskMonitor";
 import type { ProjectRef, RemoteTree } from "./tools/ports";
 import type { ApprovalDecision } from "./tools/runner";
 import type { DownloadResult, UploadResult } from "./tools/transfer";
+import type { AppUpdate } from "./update";
 import type { LocalEntry } from "./workspace/localFiles";
 
 export interface ApprovalPrompt {
@@ -147,6 +148,11 @@ export interface DesktopBridge {
   links: {
     open(url: string): Promise<void>;
   };
+  app: {
+    /** A newer version published for this platform, or null when this one is current
+     *  (or the server cannot say). */
+    update(): Promise<AppUpdate | null>;
+  };
   /** Speech through the server, on the user's OpenAI key. */
   voice: {
     /** A 16 kHz mono wav recording, as text; empty when nothing was said. */
@@ -261,6 +267,7 @@ export const CHANNELS = {
   dockApprove: "dock:approve",
   dockThumbnail: "dock:thumbnail",
   linksOpen: "links:open",
+  appUpdate: "app:update",
   viewerShow: "viewer:show",
   viewerProject: "viewer:project",
   viewerLocal: "viewer:local",

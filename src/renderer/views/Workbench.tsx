@@ -6,6 +6,7 @@ import { useAppearance } from "../appearance";
 import { Logo } from "../Logo";
 import { transcript } from "../../core/conversations/transcript";
 import type { ProjectRef } from "../../core/tools/ports";
+import type { AppUpdate } from "../../core/update";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { ConversationPicker } from "./chat/ConversationPicker";
 import { WorkPlacePicker } from "./chat/WorkPlacePicker";
@@ -56,6 +57,8 @@ const LAUNCH_MS = 700;
  * their own (dock/Dock.tsx). Conversations are picked by the message box (chat/ConversationPicker), and the left
  * column carries the logo, the account and the server's state.
  */
+const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000;
+
 export function Workbench({ user, connected, onSignOut }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const { appearance, choose: chooseTheme } = useAppearance();
@@ -70,6 +73,16 @@ export function Workbench({ user, connected, onSignOut }: Props) {
   // where the agent works: the local folder above, or a project folder on the server
   const [place, setPlace] = useState<WorkingPlace>({ mode: "local", local: null, remote: null });
   const [missingTools, setMissingTools] = useState<string[]>([]);
+  const [update, setUpdate] = useState<AppUpdate | null>(null);
+
+  // A newer version out for this computer: asked on start and every six hours, since
+  // the app often stays open for days.
+  useEffect(() => {
+    const ask = () => void window.desktop.app.update().then(setUpdate).catch(() => {});
+    ask();
+    const timer = window.setInterval(ask, UPDATE_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
   const [approvals, setApprovals] = useState<ApprovalPrompt[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectRef[]>([]);
@@ -553,7 +566,17 @@ export function Workbench({ user, connected, onSignOut }: Props) {
         {!user.setupComplete && (
           <p className="chat__notice">Tu cuenta aún no tiene una clave de IA. Pide a un administrador que te la asigne.</p>
         )}
-        {missingTools.length > 0 && (
+        {update && (
+          <p className="chat__notice chat__notice--update" role="status">
+            <span>Hay una nueva versión de THE WAY ({update.latest}). Tienes la {update.current}.</span>
+            {update.downloadPageUrl && (
+              <button type="button" className="ghost-button" onClick={() => void window.desktop.links.open(update.downloadPageUrl!)}>
+                DESCARGAR
+              </button>
+            )}
+          </p>
+        )}
+        {missingTools.length > 0 && !update && (
           <p className="chat__notice">Esta versión no incluye algunas herramientas del servidor ({missingTools.join(", ")}). Actualiza la aplicación.</p>
         )}
 
