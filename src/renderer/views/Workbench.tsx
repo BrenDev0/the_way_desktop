@@ -544,7 +544,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
       >
         {autoOn && (
           <p className="chat__notice chat__notice--auto" role="status">
-            MODO AUTO · el agente modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes.
+            MODO AUTO · El agente modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes.
           </p>
         )}
         {offline && (

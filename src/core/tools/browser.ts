@@ -305,10 +305,10 @@ export function browserTools(browser: BrowserPort): ToolRegistry {
   return {
     OpenBrowserPage: { run: openPage },
     ReadBrowserPage: { run: page },
-    ClickBrowserElement: { run: clickElement, preview: async (args) => `click: ${text(args, "text")}` },
+    ClickBrowserElement: { run: clickElement, preview: async (args) => `Click: ${text(args, "text")}` },
     TypeInBrowser: {
       run: typeText,
-      preview: async (args) => `type: ${text(args, "text")}${flag(args, "then_enter") ? " (then enter)" : ""}`,
+      preview: async (args) => `Type: ${text(args, "text")}${flag(args, "then_enter") ? " (then enter)" : ""}`,
     },
     ListBrowserTabs: { run: listTabs },
     SwitchBrowserTab: { run: switchTab },
@@ -322,7 +322,7 @@ export function browserTools(browser: BrowserPort): ToolRegistry {
     ReadWhatsappChat: { run: readChat },
     SendWhatsappMessage: {
       run: sendMessage,
-      preview: async (args) => `to ${text(args, "to")}\n\n${text(args, "message")}`,
+      preview: async (args) => `To ${text(args, "to")}\n\n${text(args, "message")}`,
     },
   };
 }

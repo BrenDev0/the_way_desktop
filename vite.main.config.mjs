@@ -2,20 +2,18 @@ import { defineConfig, loadEnv } from "vite";
 
 const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
 
+// The deployed backend: every build connects to it, and the app offers no way to pick
+// another. THE_WAY_SERVER_URL overrides it -- a backend on this machine, for development.
+const DEPLOYED_SERVER_URL = "https://the-way-server.up.railway.app";
+
 // The backend URL is compiled into the main process. It is not a secret; it only
-// fixes which server this build trusts. Production builds must set it and use HTTPS.
+// fixes which server this build trusts, and it must be HTTPS.
 // THE_WAY_LOCAL_BUILD=1 makes an installable build for this computer only, against a
 // backend on it (http://localhost:8000): plain HTTP to loopback never leaves the machine.
 function serverUrl(mode) {
   const env = loadEnv(mode, process.cwd(), "THE_WAY_");
-  const raw = env.THE_WAY_SERVER_URL?.trim() ?? "";
+  const raw = env.THE_WAY_SERVER_URL?.trim() || DEPLOYED_SERVER_URL;
   const local = mode !== "production" || env.THE_WAY_LOCAL_BUILD === "1";
-  if (!raw) {
-    if (mode === "production") {
-      throw new Error("Set THE_WAY_SERVER_URL (e.g. https://api.example.com) before packaging THE WAY Desktop.");
-    }
-    return "";
-  }
 
   const url = new URL(raw);
   const allowed = url.protocol === "https:" || (local && url.protocol === "http:" && LOOPBACK.includes(url.hostname));

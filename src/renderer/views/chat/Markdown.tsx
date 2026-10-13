@@ -22,7 +22,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
 const COMPONENTS: Components = {
   a: ({ href, children }) => <Link href={href}>{children}</Link>,
   img: ({ src, alt }) => (
-    <Link href={typeof src === "string" ? src : undefined}>{`🖼 ${alt || "imagen"}`}</Link>
+    <Link href={typeof src === "string" ? src : undefined}>{`🖼 ${alt || "Imagen"}`}</Link>
   ),
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   table: ({ children }) => (

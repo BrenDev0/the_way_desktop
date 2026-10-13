@@ -32,7 +32,7 @@ export function FileChips({
           >
             <span className="file-chip__glyph" aria-hidden="true">{folder ? "▸" : GLYPH[viewKind("", name)]}</span>
             <span className="file-chip__name">{name}</span>
-            <span className="file-chip__where">{where}</span>
+            <span className="file-chip__where">{"local" in file ? "Este equipo" : where}</span>
           </button>
         );
       })}

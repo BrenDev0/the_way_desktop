@@ -1,0 +1,76 @@
+# Builds THE WAY Desktop's installers -- Windows and macOS -- on GitHub's machines, so no
+# Mac is needed. It only builds: the installers are attached to the run, to download and
+# publish to the bucket by hand (the_way_backend: python -m src.downloads.publish). This
+# workflow holds no keys and touches nothing outside GitHub.
+#
+# Run it from Actions > Build desktop installers > Run workflow, choosing the branch.
+# It never runs on its own: macOS minutes count ten times against the plan's allowance.
+
+name: Build desktop installers
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Checked once, here, where minutes are cheaper: a build that fails its own tests
+      # should not become an installer.
+      - run: npm run typecheck
+      - run: npm test
+
+      - run: npm run make
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: THE-WAY-windows
+          path: out/make/squirrel.windows/x64/THE-WAY-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  mac:
+    name: macOS installer (Intel + Apple Silicon)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # One app for both kinds of Mac.
+      - run: npm run make -- --arch=universal
+
+      # Named as the download page expects it, so it goes to the bucket as it is.
+      - name: Name the zip THE-WAY-mac.zip
+        shell: bash
+        run: |
+          zip_file=$(ls out/make/zip/darwin/universal/*.zip | head -n 1)
+          cp "$zip_file" THE-WAY-mac.zip
+          ls -lh THE-WAY-mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: THE-WAY-mac
+          path: THE-WAY-mac.zip
+          if-no-files-found: error
+          retention-days: 14

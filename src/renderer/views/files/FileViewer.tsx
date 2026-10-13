@@ -61,7 +61,7 @@ export function FileViewer({ request, onClose }: { request: ViewRequest; onClose
     if (!file || (kind !== "text" && kind !== "html" && kind !== "markdown")) return "";
     return new TextDecoder().decode(file.data);
   }, [file, kind]);
-  const shown = text.length > MAX_TEXT_CHARS ? `${text.slice(0, MAX_TEXT_CHARS)}\n\n[… recortado: descárgalo para verlo entero]` : text;
+  const shown = text.length > MAX_TEXT_CHARS ? `${text.slice(0, MAX_TEXT_CHARS)}\n\n[… Recortado: descárgalo para verlo entero]` : text;
 
   async function save() {
     if (!file) return;

@@ -176,7 +176,7 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
           >
             <span className="tree__icon" aria-hidden="true">{entry.kind === "folder" ? (open ? "▾" : "▸") : "◻"}</span>
             <span className="tree__name">{entry.name}{entry.kind === "folder" ? "/" : ""}</span>
-            {entry.kind === "file" && <span className="tree__meta">{pending ? "subiendo…" : formatSize(entry.file.sizeBytes)}</span>}
+            {entry.kind === "file" && <span className="tree__meta">{pending ? "Subiendo…" : formatSize(entry.file.sizeBytes)}</span>}
             {entry.kind === "folder" && inUse(project, entry.path) && <span className="tree__badge">EN USO</span>}
           </button>
           {open && <ul>{entries(project, tree, entry.id, depth + 1)}</ul>}

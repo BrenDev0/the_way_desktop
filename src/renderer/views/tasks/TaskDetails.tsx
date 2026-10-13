@@ -16,10 +16,10 @@ export const STATE: Record<TaskView["status"], string> = {
 
 export function ago(iso: string): string {
   const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
-  if (seconds < 60) return "ahora";
-  if (seconds < 3600) return `hace ${Math.round(seconds / 60)} min`;
-  if (seconds < 86400) return `hace ${Math.round(seconds / 3600)} h`;
-  return `hace ${Math.round(seconds / 86400)} d`;
+  if (seconds < 60) return "Ahora";
+  if (seconds < 3600) return `Hace ${Math.round(seconds / 60)} min`;
+  if (seconds < 86400) return `Hace ${Math.round(seconds / 3600)} h`;
+  return `Hace ${Math.round(seconds / 86400)} d`;
 }
 
 /** Steps as a tree: a tool that runs an assistant of its own shows that assistant's calls under it. */

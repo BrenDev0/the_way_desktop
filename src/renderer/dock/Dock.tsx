@@ -10,6 +10,9 @@ import "./dock.css";
 /** What each tile's screen shows when it has no picture to show. */
 const MARK: Record<TaskView["status"], string> = { running: "▍", needs_approval: "?", done: "✓", failed: "✗" };
 
+/** "EN CURSO" as "En curso": only its first letter stays a capital. */
+const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
+
 const finished = (task: TaskView) => task.status === "done" || task.status === "failed";
 
 // How long the card's CRT power-off and a tile's finishing glitch last (dock.css).
@@ -132,7 +135,7 @@ export function Dock() {
               <span className="task__description">{open.description}</span>
               <span className="dock__prompt" key={`${open.status}-${open.steps.length}`}>
                 <span className="dock__typed">
-                  ❯ {STATE[open.status].toLowerCase()} · {ago(open.status === "running" ? open.createdAt : open.updatedAt)}
+                  ❯ {sentence(STATE[open.status])} · {ago(open.status === "running" ? open.createdAt : open.updatedAt)}
                   {" "}· {open.steps.length} {open.steps.length === 1 ? "paso" : "pasos"}
                 </span>
               </span>
@@ -246,7 +249,7 @@ function DockApproval({ task }: { task: TaskView }) {
       <p className="dock-ask__covers">Cubre hasta 10 imágenes en esta tarea.</p>
       <div className="dock-ask__answer">
         {sent ? (
-          <span className="dock-ask__sent">{sent === "yes" ? "❯ aprobado · continuando…" : "❯ rechazado · sigue sin imágenes"}</span>
+          <span className="dock-ask__sent">{sent === "yes" ? "❯ Aprobado · continuando…" : "❯ Rechazado · sigue sin imágenes"}</span>
         ) : (
           <>
             <button type="button" className="ghost-button" onClick={() => void answer(false)}>[ NO ]</button>

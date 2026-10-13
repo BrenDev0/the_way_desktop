@@ -286,7 +286,7 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
   }
 
   const root = children.get("");
-  const target = selected ? `"${selected.name}"` : "toda la carpeta";
+  const target = selected ? `"${selected.name}"` : "Toda la carpeta";
 
   return (
     <div className="files__body" onKeyDown={onKeyDown}>
@@ -342,7 +342,7 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
                 </select>
               </label>
               <label>CARPETA EN EL PROYECTO
-                <input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="raíz del proyecto" disabled={uploading} spellCheck={false} />
+                <input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="Raíz del proyecto" disabled={uploading} spellCheck={false} />
               </label>
               <p className="files__hint">Los archivos que ya estén en el proyecto se omiten, nunca se reemplazan.</p>
               <div className="files__upload-actions">
