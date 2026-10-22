@@ -1,0 +1,46 @@
+name: CI
+
+# Type-check and test every push and pull request. The desktop app is not a Docker image, so
+# nothing is pushed to Docker Hub: its installers are built by "Build desktop installers"
+# (build-installers.yml, run by hand because macOS minutes cost ten times the others) and
+# published to the bucket from the backend (python -m src.downloads.publish).
+#
+# This one runs on Linux, which is cheap, and needs no secrets.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same pull request replaces the run in progress; main always finishes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # The tests never start Electron (the one end-to-end test needs a live backend and is
+      # skipped), so its ~100 MB binary is not downloaded on every run.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same Node the installer workflow builds with.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
