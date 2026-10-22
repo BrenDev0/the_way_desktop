@@ -2,10 +2,10 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BROWSER_TOOLS, FILE_TOOLS, TRANSFER_TOOLS } from "../../src/core/tools/contract";
+import { BROWSER_TOOLS, FILE_TOOLS, GIT_TOOLS, TRANSFER_TOOLS } from "../../src/core/tools/contract";
 import { desktopTools } from "../../src/core/tools";
 import { fileTools } from "../../src/core/tools/files";
-import type { BrowserPort, ProjectsApiPort } from "../../src/core/tools/ports";
+import type { BrowserPort, GitPort, ProjectsApiPort } from "../../src/core/tools/ports";
 import { NodeFileSystem } from "../../src/main/nodeFileSystem";
 
 let base: string;
@@ -82,7 +82,8 @@ describe("the tool contract", () => {
       files: new NodeFileSystem(async () => root),
       browser: {} as BrowserPort,
       projects: {} as ProjectsApiPort,
+      git: {} as GitPort,
     });
-    expect(Object.keys(registry).sort()).toEqual([...FILE_TOOLS, ...TRANSFER_TOOLS, ...BROWSER_TOOLS].sort());
+    expect(Object.keys(registry).sort()).toEqual([...FILE_TOOLS, ...TRANSFER_TOOLS, ...BROWSER_TOOLS, ...GIT_TOOLS].sort());
   });
 });

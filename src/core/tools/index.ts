@@ -1,13 +1,15 @@
 import { browserTools } from "./browser";
 import type { ToolRegistry } from "./contract";
 import { fileTools } from "./files";
-import type { BrowserPort, FileSystemPort, ProjectsApiPort } from "./ports";
+import { gitTools } from "./git";
+import type { BrowserPort, FileSystemPort, GitPort, ProjectsApiPort } from "./ports";
 import { transferTools } from "./transfer";
 
 export interface ToolDependencies {
   files: FileSystemPort;
   browser: BrowserPort;
   projects: ProjectsApiPort;
+  git: GitPort;
 }
 
 /** Every desktop tool this build implements, bound to the machine it runs on. */
@@ -16,5 +18,6 @@ export function desktopTools(dependencies: ToolDependencies): ToolRegistry {
     ...fileTools(dependencies.files),
     ...transferTools(dependencies.files, dependencies.projects),
     ...browserTools(dependencies.browser),
+    ...gitTools(dependencies.git, dependencies.files),
   };
 }

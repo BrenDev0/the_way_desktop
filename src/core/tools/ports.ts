@@ -66,6 +66,24 @@ export interface BrowserPort {
   wait(milliseconds: number): Promise<void>;
 }
 
+export interface GitResult {
+  /** The exit code; git's own failures come back here, not as exceptions. */
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * The git on the user's computer, run inside the folder they opened. The adapter owns the
+ * safety: no shell, no prompts, no pager, no looking for a repository above the open
+ * folder. It throws a ToolError for what is not git's doing -- git not installed, no
+ * folder open, a command that ran out of time.
+ */
+export interface GitPort {
+  /** `args` are everything after "git". `network` gives a slower command more time. */
+  run(args: string[], options?: { network?: boolean }): Promise<GitResult>;
+}
+
 export interface ProjectRef {
   id: string;
   name: string;

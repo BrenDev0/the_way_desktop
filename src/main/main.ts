@@ -22,6 +22,7 @@ import { DockWindow } from "./dockWindow";
 import { ElectronBrowser } from "./electronBrowser";
 import { registerAppHandlers, type AppServices } from "./ipc";
 import { NodeFileSystem } from "./nodeFileSystem";
+import { NodeGit } from "./nodeGit";
 import { ProjectsApi } from "./projectsApi";
 import { ServerConnectionAdapter } from "./serverConnectionAdapter";
 import { handleSquirrelEvent } from "./squirrel";
@@ -186,7 +187,12 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
   const projects = new ProjectsApi(api);
 
   const runner = new ToolRunner(
-    desktopTools({ files: fileSystem, browser: new ElectronBrowser(), projects }),
+    desktopTools({
+      files: fileSystem,
+      browser: new ElectronBrowser(),
+      projects,
+      git: new NodeGit(() => workspace.current()),
+    }),
     // one image approval covers the rest of a reply's images; background tasks keep the
     // same allowance on the server
     new ImageAllowance(auto),

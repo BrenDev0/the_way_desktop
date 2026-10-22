@@ -14,7 +14,7 @@ import { AuthService, type TokenStorePort } from "../../src/core/auth";
 import type { ServerConnectionPort } from "../../src/core/connection";
 import { TurnService } from "../../src/core/conversations/turnService";
 import { desktopTools } from "../../src/core/tools";
-import type { BrowserPort } from "../../src/core/tools/ports";
+import type { BrowserPort, GitPort } from "../../src/core/tools/ports";
 import { ToolRunner, type ApprovalDecision, type ApprovalRequest } from "../../src/core/tools/runner";
 import { ApiClient } from "../../src/main/apiClient";
 import { ConversationEvents } from "../../src/main/conversationEvents";
@@ -63,7 +63,7 @@ describe.skipIf(!url)("desktop round trip against a real server", () => {
     };
     api = new ApiClient(connection, tokens, () => {});
     runner = new ToolRunner(
-      desktopTools({ files: new NodeFileSystem(async () => folder), browser: {} as BrowserPort, projects: new ProjectsApi(api) }),
+      desktopTools({ files: new NodeFileSystem(async () => folder), browser: {} as BrowserPort, projects: new ProjectsApi(api), git: {} as GitPort }),
       approvals,
     );
     turns = new TurnService(api, new ConversationEvents(api), runner, {

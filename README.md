@@ -43,7 +43,7 @@ The app talks to the backend's desktop API (`/api/desktop/v1`) with a bearer tok
 
 The agent runs on the server. When it needs this machine, the conversation pauses (`awaiting_client`) and `TurnService` (`src/core/conversations`) has `ToolRunner` (`src/core/tools/runner.ts`) settle every pending call — run it here, ask the user first when it needs approval, or answer that it is unknown — and posts the results back. The contract is `backend_the_way/docs/desktop-tools.md`.
 
-- `src/core/tools/` — the 23 tools as plain logic over ports: `files.ts` (11 local file tools), `transfer.ts` (upload/download to projects), `browser.ts` (browser and WhatsApp). `contract.ts` lists the names; at start-up the app compares them with the server's `GET /desktop-tools` and warns about any it lacks.
+- `src/core/tools/` — the 31 tools as plain logic over ports: `files.ts` (12 local file tools), `transfer.ts` (upload/download to projects), `browser.ts` (browser and WhatsApp), `git.ts` (the user's own git, in the open folder: look, stage, commit, push; `src/main/nodeGit.ts` runs it). `contract.ts` lists the names; at start-up the app compares them with the server's `GET /desktop-tools` and warns about any it lacks.
 - `src/main/nodeFileSystem.ts` — the disk, fenced to the folder the user chose (`<userData>/workspace.json`). Every path is resolved against it and its real location, symlinks followed, must stay inside.
 - `src/main/electronBrowser.ts` — the assistant's own visible browser windows, with a persistent profile (`persist:assistant-browser`) so WhatsApp Web stays signed in.
 
