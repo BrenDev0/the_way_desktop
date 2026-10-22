@@ -6,8 +6,9 @@ import { useAppearance } from "../appearance";
 import { Logo } from "../Logo";
 import { transcript } from "../../core/conversations/transcript";
 import type { ProjectRef } from "../../core/tools/ports";
-import type { AppUpdate } from "../../core/update";
+import type { UpdateCheck } from "../../core/update";
 import { ApprovalDialog } from "./ApprovalDialog";
+import { UpdateLine } from "./UpdateLine";
 import { ConversationPicker } from "./chat/ConversationPicker";
 import { WorkPlacePicker } from "./chat/WorkPlacePicker";
 import { Markdown } from "./chat/Markdown";
@@ -73,16 +74,22 @@ export function Workbench({ user, connected, onSignOut }: Props) {
   // where the agent works: the local folder above, or a project folder on the server
   const [place, setPlace] = useState<WorkingPlace>({ mode: "local", local: null, remote: null });
   const [missingTools, setMissingTools] = useState<string[]>([]);
-  const [update, setUpdate] = useState<AppUpdate | null>(null);
+  const [updateCheck, setUpdateCheck] = useState<UpdateCheck | null>(null);
+  // the banner in the chat appears only when a newer version is out
+  const update = updateCheck?.update ?? null;
 
-  // A newer version out for this computer: asked on start and every six hours, since
-  // the app often stays open for days.
+  // Whether a newer version is out for this computer: asked on start and every six hours,
+  // since the app often stays open for days, and on request from the rail (UpdateLine).
+  const checkForUpdate = useCallback(
+    () => window.desktop.app.update().then(setUpdateCheck).catch(() => {}),
+    [],
+  );
   useEffect(() => {
-    const ask = () => void window.desktop.app.update().then(setUpdate).catch(() => {});
+    const ask = () => void checkForUpdate();
     ask();
     const timer = window.setInterval(ask, UPDATE_CHECK_MS);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [checkForUpdate]);
   const [approvals, setApprovals] = useState<ApprovalPrompt[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectRef[]>([]);
@@ -515,6 +522,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
             <span className="selectable" title={user.email}>{user.email}</span>
             <button type="button" className="ghost-button" onClick={onSignOut}>SALIR</button>
           </div>
+          <UpdateLine check={updateCheck} onCheck={checkForUpdate} />
           <div className="theme-switch" role="group" aria-label="Tema">
             {THEMES.map(([theme, label, hint]) => (
               <button

@@ -16,7 +16,7 @@ import {
 } from "../core/bridge";
 import type { ConnectionResult, ServerConnectionPort, ServerSettings } from "../core/connection";
 import type { ApprovalDecision } from "../core/tools/runner";
-import type { AppUpdate } from "../core/update";
+import type { UpdateCheck } from "../core/update";
 
 const connection: ServerConnectionPort = {
   load: () => ipcRenderer.invoke("connection:load") as Promise<ServerSettings>,
@@ -83,7 +83,7 @@ const desktop: DesktopBridge = {
     open: (url) => ipcRenderer.invoke(CHANNELS.linksOpen, url) as Promise<void>,
   },
   app: {
-    update: () => ipcRenderer.invoke(CHANNELS.appUpdate) as Promise<AppUpdate | null>,
+    update: () => ipcRenderer.invoke(CHANNELS.appUpdate) as Promise<UpdateCheck>,
   },
   viewer: {
     project: (projectName, path) => ipcRenderer.invoke(CHANNELS.viewerProject, projectName, path) as Promise<ViewedFile>,

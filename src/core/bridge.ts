@@ -11,7 +11,7 @@ import type { TaskView } from "./tasks/taskMonitor";
 import type { ProjectRef, RemoteTree } from "./tools/ports";
 import type { ApprovalDecision } from "./tools/runner";
 import type { DownloadResult, UploadResult } from "./tools/transfer";
-import type { AppUpdate } from "./update";
+import type { UpdateCheck } from "./update";
 import type { LocalEntry } from "./workspace/localFiles";
 
 export interface ApprovalPrompt {
@@ -149,9 +149,9 @@ export interface DesktopBridge {
     open(url: string): Promise<void>;
   };
   app: {
-    /** A newer version published for this platform, or null when this one is current
-     *  (or the server cannot say). */
-    update(): Promise<AppUpdate | null>;
+    /** Asks the server for the latest published version of this installer and compares it
+     *  with the running one. Never rejects: a server that cannot be asked is `failed`. */
+    update(): Promise<UpdateCheck>;
   };
   /** Speech through the server, on the user's OpenAI key. */
   voice: {

@@ -10,7 +10,7 @@ import type { TaskMonitor } from "../core/tasks/taskMonitor";
 import { mustAsk, type AutoApprovals } from "../core/tools/autoApprovals";
 import type { ToolRunner } from "../core/tools/runner";
 import { contentTypeFor, downloadFromProject, findProjectFile, uploadToProject } from "../core/tools/transfer";
-import { updateFrom, type AppVersionAnswer } from "../core/update";
+import { checkFrom, failedCheck, type AppVersionAnswer } from "../core/update";
 import { LocalFilesError, type LocalFiles } from "../core/workspace/localFiles";
 import { operatorMessage } from "../core/workspace/messages";
 import type { NodeFileSystem } from "./nodeFileSystem";
@@ -231,14 +231,15 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     return projects.removeEntry(requireId(projectId, "project"), kind, requireId(id, "entry"));
   }));
 
-  // Asked by the window on start and every few hours. Public on the server, so an expired
-  // session still hears about a new version; any failure is just "no update".
+  // Asked by the window on start, every few hours, and when the person presses BUSCAR. Public
+  // on the server, so an expired session still hears about a new version. A server that cannot
+  // be asked is answered as `failed`, not as "no update", so the window can say so.
   handle(CHANNELS.appUpdate, async () => {
     try {
       const answer = await services.api.request<AppVersionAnswer>("GET", "/app/version");
-      return updateFrom(answer, app.getVersion(), process.platform);
+      return checkFrom(answer, app.getVersion(), process.platform);
     } catch {
-      return null;
+      return failedCheck(app.getVersion());
     }
   });
 

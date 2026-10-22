@@ -73,6 +73,12 @@ button:disabled { cursor: wait; }
 .rail__account { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
 .rail__account > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail__account .ghost-button { flex: none; padding: 5px 9px; font-size: 9px; }
+/* The installed version, how it stands against what is published, and a button to ask again. */
+.rail__version { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 10px; }
+.rail__version-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; letter-spacing: .07em; }
+.rail__version-head .ghost-button, .rail__version-download { flex: none; padding: 5px 9px; font-size: 9px; }
+.rail__version-text { margin: 0; line-height: 1.4; }
+.rail__version-download { align-self: flex-start; }
 /* Light, dark, or as Windows is: one segmented switch, the picked one lit. */
 .theme-switch { display: flex; border: 1px solid var(--border-dim); border-radius: 4px; overflow: hidden; }
 .theme-switch button { flex: 1; padding: 5px 0; border: 0; border-left: 1px solid var(--border-dim); background: transparent; color: var(--muted); font: inherit; font-size: 9px; font-weight: 700; letter-spacing: .1em; cursor: pointer; transition: background .15s, color .15s; }
