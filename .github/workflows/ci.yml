@@ -1,11 +1,12 @@
 name: CI
 
-# Type-check and test every push and pull request. The desktop app is not a Docker image, so
-# nothing is pushed to Docker Hub: its installers are built by "Build desktop installers"
-# (build-installers.yml, run by hand because macOS minutes cost ten times the others) and
-# published to the bucket from the backend (python -m src.downloads.publish).
+# Type-check and test every push and pull request, each as its own job, so the run shows which
+# one failed. The desktop app is not a Docker image, so nothing is pushed to Docker Hub: its
+# installers are built by "Build desktop installers" (build-installers.yml, run by hand because
+# macOS minutes cost ten times the others) and published to the bucket from the backend
+# (python -m src.downloads.publish).
 #
-# This one runs on Linux, which is cheap, and needs no secrets.
+# These run on Linux, which is cheap, and need no secrets.
 
 on:
   push:
@@ -21,26 +22,35 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The tests never start Electron (the one end-to-end test needs a live backend and is
+  # skipped), so its ~100 MB binary is not downloaded on every run.
+  ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
 jobs:
-  test:
-    name: Typecheck and tests
+  # The same Node the installer workflow builds with.
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      # The tests never start Electron (the one end-to-end test needs a live backend and is
-      # skipped), so its ~100 MB binary is not downloaded on every run.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
-
-      # The same Node the installer workflow builds with.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - run: npm ci
-
       - run: npm run typecheck
 
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm test
