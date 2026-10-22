@@ -1,0 +1,2 @@
+# Shell scripts run on Linux (the workflow runners): a CRLF line ending breaks them.
+*.sh text eol=lf

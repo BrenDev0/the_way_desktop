@@ -4,9 +4,28 @@ Operator client for Windows and macOS. The first slice connects to the backend's
 
 ## Server URL
 
-Every organization uses the same backend, so release builds have its URL compiled in from `THE_WAY_SERVER_URL` (environment variable or a local `.env`, see `.env.example`). The URL is not a secret; it fixes which server the build trusts. It lives in the main process: the renderer cannot change it, and connection calls ignore any other address. `npm run package` and `npm run make` fail unless it is set to a bare HTTPS origin.
+Every organization uses the same backend, so every build has its URL compiled in: the deployed backend by default (`DEPLOYED_SERVER_URL` in `vite.main.config.mjs`), or `THE_WAY_SERVER_URL` (environment variable or a local `.env`, see `.env.example`) to point a build somewhere else. The URL is not a secret; it fixes which server the build trusts. It lives in the main process: the renderer cannot change it, and connection calls ignore any other address. `npm run package` and `npm run make` fail if it is not a bare HTTPS origin.
 
 In development the variable is optional. Without it the app shows the address field and saves the chosen server locally; with it (loopback HTTP allowed, e.g. `http://localhost:8000`) the app behaves like a release build.
+
+## Releasing
+
+A release builds both installers on GitHub and publishes them to the bucket, where the download page offers them and installed apps learn a newer version is out.
+
+```
+npm version 0.1.2 --no-git-tag-version        # package.json and package-lock.json together
+git commit -am "0.1.2"
+git tag v0.1.2
+git push && git push --tags
+```
+
+The tag starts the "Build desktop installers" workflow. It refuses to run unless the tag is `v` + `package.json`'s version and the lockfile agrees, builds Windows and macOS, then **waits for your approval** in the Actions tab before it uploads anything. Each installer goes up before its `latest.json`, so an app told about a version always finds it. Approve, and the next time an installed app checks (at start, every six hours, or when its operator presses BUSCAR in the left column) it offers the new version.
+
+Running the workflow by hand from the Actions tab only builds and attaches the installers; it never publishes.
+
+One-time setup, in the repo's **Settings > Environments**: create `production`, add yourself under *Required reviewers*, and give it the bucket's settings (the same the API runs with): secrets `BUCKET_ACCESS_KEY_ID` and `BUCKET_SECRET_ACCESS_KEY`, variables `BUCKET_NAME`, `BUCKET_ENDPOINT`, `BUCKET_REGION` and `BUCKET_PREFIX`. Only the publish job can read them. A key limited to `downloads/desktop/` is safer than the API's, if the bucket can make one.
+
+To publish by hand instead (from the backend): `python -m src.downloads.publish windows <installer> --version 0.1.2`, then the same for `mac`.
 
 ## Architecture
 
