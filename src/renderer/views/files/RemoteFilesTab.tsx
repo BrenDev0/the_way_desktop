@@ -143,7 +143,7 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
     if (!workable || !onWorkHere) return;
     await act(async () => {
       await onWorkHere(workable.project, workable.path);
-      setNotice({ error: false, text: `El agente trabaja ahora en ${workable.path ? `${workable.project}/${workable.path}` : workable.project}.` });
+      setNotice({ error: false, text: `AGENTIX trabaja ahora en ${workable.path ? `${workable.project}/${workable.path}` : workable.project}.` });
     });
   }
 
@@ -198,7 +198,7 @@ export function RemoteFilesTab({ projects, folder, localTarget, refreshKey, focu
             className="ghost-button"
             disabled={busy || !workable || inUse(selected!.project, workable.path)}
             onClick={() => void workHere()}
-            title={workable ? `Que el agente trabaje en ${workable.path ? `${workable.project}/${workable.path}` : workable.project}` : "Selecciona un proyecto o una carpeta"}
+            title={workable ? `Que AGENTIX trabaje en ${workable.path ? `${workable.project}/${workable.path}` : workable.project}` : "Selecciona un proyecto o una carpeta"}
           >
             ◆ TRABAJAR AQUÍ
           </button>

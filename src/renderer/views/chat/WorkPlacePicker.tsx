@@ -157,7 +157,7 @@ export function WorkPlacePicker({ place, projects, onChooseLocal, onUse, onSetRe
         aria-expanded={open}
         title={remote
           ? `Carpeta de trabajo en el servidor: ${label}. Clic para cambiarla.`
-          : place.local ? `Carpeta de trabajo en este equipo: ${place.local}. Clic para cambiarla.` : "Elige dónde trabaja el agente."}
+          : place.local ? `Carpeta de trabajo en este equipo: ${place.local}. Clic para cambiarla.` : "Elige dónde trabaja AGENTIX."}
       >
         <span aria-hidden="true">{remote ? "☁" : "▣"}</span>
         <span className="chat__folder-name">{label}</span>
@@ -176,7 +176,7 @@ export function WorkPlacePicker({ place, projects, onChooseLocal, onUse, onSetRe
 
           {tab === "local" ? (
             <div className="place__body">
-              <p className="place__hint">Una carpeta de este equipo: el agente lee, crea y modifica archivos ahí.</p>
+              <p className="place__hint">Una carpeta de este equipo: AGENTIX lee, crea y modifica archivos ahí.</p>
               {place.local ? (
                 <div className={place.mode === "local" ? "place__current place__current--on" : "place__current"}>
                   <span className="selectable" title={place.local}>{place.local}</span>
@@ -191,7 +191,7 @@ export function WorkPlacePicker({ place, projects, onChooseLocal, onUse, onSetRe
             </div>
           ) : (
             <div className="place__body">
-              <p className="place__hint">Un proyecto del servidor, o una carpeta dentro: el agente trabaja y entrega ahí. ▸ abre lo que hay dentro.</p>
+              <p className="place__hint">Un proyecto del servidor, o una carpeta dentro: AGENTIX trabaja y entrega ahí. ▸ abre lo que hay dentro.</p>
               {projects.length ? (
                 <ul className="place__folders" aria-label="Proyectos y carpetas">
                   {projects.map((project) => {

@@ -325,7 +325,7 @@ export function LocalFilesTab({ folder, projects, defaultProject, refreshKey, on
         }}
       >
         {!root ? <p className="files__hint">Cargando…</p> : !root.length && editing?.mode !== "create" ? (
-          <p className="files__hint">La carpeta está vacía. El agente guardará aquí lo que cree.</p>
+          <p className="files__hint">La carpeta está vacía. AGENTIX guardará aquí lo que cree.</p>
         ) : <ul>{rows("", 0)}</ul>}
       </div>
 

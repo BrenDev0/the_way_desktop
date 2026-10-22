@@ -74,7 +74,7 @@ export const PLACES: Record<Place, string> = {
   proyecto: "PROYECTO EN EL SERVIDOR",
   web: "WEB",
   navegador: "NAVEGADOR",
-  agente: "AGENTE",
+  agente: "AGENTIX",
 };
 
 // The argument that says what a call was about, in the order worth showing.

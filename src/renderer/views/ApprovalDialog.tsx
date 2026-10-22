@@ -104,7 +104,7 @@ export function ApprovalDialog({ prompt, onAnswer }: Props) {
         {IMAGE_TOOLS.has(call.name) && (
           <p className="approval__covers">
             Esta aprobación cubre hasta {IMAGES_PER_APPROVAL} imágenes, generadas y editadas, en {origin ? "esta tarea" : "esta respuesta"}
-            {" "}con el modelo que elijas: el agente puede refinar el resultado en varias rondas sin volver a preguntarte.
+            {" "}con el modelo que elijas: AGENTIX puede refinar el resultado en varias rondas sin volver a preguntarte.
           </p>
         )}
         <label htmlFor="approval-feedback">SI LO RECHAZAS, ¿QUÉ DEBERÍA HACER EN SU LUGAR? (OPCIONAL)</label>

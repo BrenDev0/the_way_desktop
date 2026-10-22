@@ -3,7 +3,7 @@ import type { Conversation } from "../../../core/api";
 
 const STATUS: Record<Conversation["status"], string> = {
   idle: "LISTA",
-  running: "TRABAJANDO…",
+  running: "AGENTIX TRABAJANDO…",
   awaiting_client: "ESPERA A ESTE EQUIPO",
   paused: "EN PAUSA",
   failed: "FALLÓ",
@@ -154,7 +154,7 @@ export function ConversationPicker({ conversations, activeId, onOpen, onNew, onD
                       className="convo__delete"
                       onClick={() => setConfirming(conversation.id)}
                       disabled={conversation.status === "running"}
-                      title={conversation.status === "running" ? "Está trabajando; espera a que termine" : "Eliminar conversación"}
+                      title={conversation.status === "running" ? "AGENTIX está trabajando; espera a que termine" : "Eliminar conversación"}
                       aria-label={`Eliminar ${conversation.title}`}
                     >
                       ✕

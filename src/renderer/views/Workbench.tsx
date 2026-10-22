@@ -30,7 +30,7 @@ interface Props {
 
 const STATUS: Record<Conversation["status"], string> = {
   idle: "LISTO",
-  running: "EL AGENTE ESTÁ TRABAJANDO...",
+  running: "AGENTIX ESTÁ TRABAJANDO...",
   awaiting_client: "ESPERANDO ESTE EQUIPO",
   paused: "TURNO EN PAUSA",
   failed: "EL ÚLTIMO TURNO FALLÓ",
@@ -384,7 +384,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
     try {
       const finished = await window.desktop.conversations.send(id, text, voice.on, files.map((file) => file.fileId));
       setStatus(finished);
-      if (finished.status === "failed") setError("El agente no pudo terminar este turno.");
+      if (finished.status === "failed") setError("AGENTIX no pudo terminar este turno.");
     } catch (reason) {
       setError(sendError(reason));
       setAttached((current) => [...sentItems, ...current]);
@@ -409,7 +409,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
     try {
       const finished = await window.desktop.conversations.retry(id);
       setStatus(finished);
-      if (finished.status === "failed") setError("El agente no pudo terminar este turno.");
+      if (finished.status === "failed") setError("AGENTIX no pudo terminar este turno.");
     } catch (reason) {
       setError(sendError(reason));
     } finally {
@@ -557,7 +557,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
       >
         {autoOn && (
           <p className="chat__notice chat__notice--auto" role="status">
-            MODO AUTO · El agente modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes.
+            MODO AUTO · AGENTIX modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes.
           </p>
         )}
         {offline && (
@@ -605,7 +605,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
           {!messages.length && !live && (
             <div className="chat__empty">
               <p className="eyebrow"><span className="eyebrow__line" /> EL CAMINO COMIENZA AQUÍ</p>
-              <p>Pide lo que necesites. El agente trabaja en el servidor y usa este equipo solo con tu permiso.</p>
+              <p>Pide lo que necesites. AGENTIX trabaja en el servidor y usa este equipo solo con tu permiso.</p>
             </div>
           )}
           <div ref={bottom} />
@@ -656,7 +656,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
               onClick={() => void window.desktop.approvals.setAuto(!autoOn).then(setAutoOn)}
               aria-pressed={autoOn}
               title={autoOn
-                ? "Modo auto activo: el agente actúa sin pedir permiso, salvo para eliminar y generar imágenes. Clic para volver a preguntar."
+                ? "Modo auto activo: AGENTIX actúa sin pedir permiso, salvo para eliminar y generar imágenes. Clic para volver a preguntar."
                 : "Modo auto: aprobar todo sin preguntar, salvo eliminar y generar imágenes. Se apaga al cerrar la app."}
             >
               {autoOn ? "⚡ AUTO ON" : "AUTO OFF"}
@@ -702,7 +702,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
               addFiles(files);
             }}
             placeholder={sending
-              ? "El agente está trabajando… puedes ir escribiendo el siguiente mensaje"
+              ? "AGENTIX está trabajando… puedes ir escribiendo el siguiente mensaje"
               : "Escribe un mensaje…  (Shift+Enter: nueva línea · mantén Ctrl+M para hablar)"}
             rows={2}
             autoFocus
@@ -839,7 +839,7 @@ function PauseBanner({ pause, onRetry }: { pause: TurnPause | null | undefined; 
         {pause?.detail && (pause.reason === "quota" || pause.reason === "credentials") && (
           <span className="chat__pause-detail selectable">{pause.detail}</span>
         )}
-        <span className="chat__pause-safe">Todo lo que hizo el agente hasta aquí está guardado.</span>
+        <span className="chat__pause-safe">Todo lo que hizo AGENTIX hasta aquí está guardado.</span>
       </div>
       <button type="button" className="chat__pause-retry" onClick={onRetry}>
         REANUDAR
@@ -853,6 +853,6 @@ function sendError(reason: unknown): string {
   if (text.includes("api_key_not_configured") || text.includes("has not been set up")) {
     return "Tu cuenta aún no tiene una clave de IA. Pide a un administrador que te la asigne.";
   }
-  if (text.includes("conversation_busy") || text.includes("still working")) return "La conversación sigue trabajando en el mensaje anterior.";
+  if (text.includes("conversation_busy") || text.includes("still working")) return "AGENTIX sigue trabajando en el mensaje anterior.";
   return "No se pudo enviar el mensaje.";
 }

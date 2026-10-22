@@ -126,7 +126,7 @@ export function TaskDetails({ task, onOpenProject, onOpenConversation, onReview,
         route ? <Route steps={task.steps} running={task.status === "running"} /> : <StepList steps={task.steps} depth={0} />
       ) : (
         <p className="task__quiet">
-          {task.status === "running" ? "Trabajando… los pasos aparecerán aquí." : "Sin pasos registrados en esta sesión."}
+          {task.status === "running" ? "AGENTIX trabajando… los pasos aparecerán aquí." : "Sin pasos registrados en esta sesión."}
         </p>
       )}
       {files.length > 0 && onOpenFile && (
