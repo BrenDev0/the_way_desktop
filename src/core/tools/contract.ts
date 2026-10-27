@@ -34,6 +34,8 @@ export const BROWSER_TOOLS = [
   "SendWhatsappMessage",
 ] as const;
 
+export const COMMAND_TOOLS = ["RunCommand"] as const;
+
 export const GIT_TOOLS = [
   "GitStatus",
   "GitLog",
@@ -47,6 +49,7 @@ export const GIT_TOOLS = [
 
 /** Asked about even if the server forgot to flag them -- the union of both lists wins. */
 export const REQUIRES_APPROVAL: ReadonlySet<string> = new Set([
+  "RunCommand",
   "GitAdd",
   "GitCommit",
   "GitPush",

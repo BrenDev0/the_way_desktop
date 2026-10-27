@@ -22,6 +22,7 @@ import { DockWindow } from "./dockWindow";
 import { ElectronBrowser } from "./electronBrowser";
 import { registerAppHandlers, type AppServices } from "./ipc";
 import { NodeFileSystem } from "./nodeFileSystem";
+import { NodeCommand } from "./nodeCommand";
 import { NodeGit } from "./nodeGit";
 import { ProjectsApi } from "./projectsApi";
 import { ServerConnectionAdapter } from "./serverConnectionAdapter";
@@ -194,6 +195,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
       browser: new ElectronBrowser(),
       projects,
       git: new NodeGit(() => workspace.current()),
+      command: new NodeCommand(() => workspace.current()),
     }),
     // one image approval covers the rest of a reply's images; background tasks keep the
     // same allowance on the server

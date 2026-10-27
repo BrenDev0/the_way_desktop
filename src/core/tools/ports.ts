@@ -84,6 +84,29 @@ export interface GitPort {
   run(args: string[], options?: { network?: boolean }): Promise<GitResult>;
 }
 
+export interface CommandResult {
+  /** The exit code; null when the command was ended before it finished. */
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  /** It ran past its time limit and was ended. */
+  timedOut: boolean;
+}
+
+/**
+ * The user's own shell, run in the folder they opened. The adapter owns the safety that is
+ * not the user's to give: no input, a time limit that ends the command and what it started,
+ * and a cap on what it may print. It throws a ToolError for what is not the command's doing
+ * -- no folder open, no shell to start.
+ */
+export interface CommandPort {
+  /** What the commands run in, for the model to write them for ("PowerShell (Windows)", "bash"). */
+  readonly shell: string;
+  /** The folder commands run in, or null when none is open. */
+  folder(): Promise<string | null>;
+  run(command: string, timeoutMs: number): Promise<CommandResult>;
+}
+
 export interface ProjectRef {
   id: string;
   name: string;
