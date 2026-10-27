@@ -572,7 +572,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
           <p className="chat__notice" role="status">Sin conexión con el servidor. Reintentando…</p>
         )}
         {!user.setupComplete && (
-          <p className="chat__notice">Tu cuenta aún no tiene una clave de IA. Pide a un administrador que te la asigne.</p>
+          <p className="chat__notice">El acceso a la IA de tu organización todavía no está habilitado. Escribe a Xplorers para activarlo.</p>
         )}
         {update && (
           <p className="chat__notice chat__notice--update" role="status">
@@ -859,7 +859,7 @@ function PauseBanner({ pause, onRetry }: { pause: TurnPause | null | undefined; 
 function sendError(reason: unknown): string {
   const text = reason instanceof Error ? reason.message : String(reason);
   if (text.includes("api_key_not_configured") || text.includes("has not been set up")) {
-    return "Tu cuenta aún no tiene una clave de IA. Pide a un administrador que te la asigne.";
+    return "El acceso a la IA de tu organización todavía no está habilitado. Escribe a Xplorers para activarlo.";
   }
   if (text.includes("conversation_busy") || text.includes("still working")) return "AGENTIX sigue trabajando en el mensaje anterior.";
   return "No se pudo enviar el mensaje.";

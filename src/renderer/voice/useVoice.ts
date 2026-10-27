@@ -196,8 +196,8 @@ function micError(reason: unknown): string {
 
 function voiceError(reason: unknown): string {
   const text = reason instanceof Error ? reason.message : String(reason);
-  if (text.includes("needs an OpenAI key")) return "La voz necesita una clave de OpenAI. Pide a un administrador que te la asigne.";
-  if (text.includes("OpenAI key was rejected")) return "Tu clave de OpenAI fue rechazada. Pide a un administrador una nueva.";
+  if (text.includes("needs an OpenAI key")) return "La voz necesita una clave de OpenAI y tu organización aún no la tiene. Escribe a Xplorers para activarla.";
+  if (text.includes("OpenAI key was rejected")) return "La clave de OpenAI de tu organización fue rechazada. Escribe a Xplorers para que la reemplacen.";
   if (text.includes("too long")) return "La grabación es demasiado larga.";
   if (text.includes("could not be reached")) return "Sin conexión con el servidor.";
   return "La voz no está disponible en este momento.";

@@ -12,7 +12,7 @@ export function pauseText(pause: TurnPause | null | undefined): { title: string;
     case "quota":
       return {
         title: "La clave de IA se quedó sin saldo",
-        body: "La cuenta del proveedor llegó a su cuota o límite de gasto. Recarga saldo o pide otra clave a un administrador, y reanuda.",
+        body: "La cuenta del proveedor llegó a su cuota o límite de gasto. Recarga saldo en esa cuenta o pide a Xplorers que ponga otra clave, y reanuda.",
       };
     case "timeout":
       return {
@@ -27,7 +27,7 @@ export function pauseText(pause: TurnPause | null | undefined): { title: string;
     case "credentials":
       return {
         title: "El proveedor rechazó la clave de IA",
-        body: "La clave es inválida, fue revocada o no tiene acceso a este modelo. Pide a un administrador que la revise, y reanuda.",
+        body: "La clave es inválida, fue revocada o no tiene acceso a este modelo. Pide a Xplorers que la revise, y reanuda.",
       };
     case "interrupted":
       return {
