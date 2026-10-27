@@ -37,6 +37,8 @@ export interface TaskStep {
 export interface TaskView extends BackgroundTask {
   /** The tool calls seen while this app was watching, in the order they started. */
   steps: TaskStep[];
+  /** Stop was pressed and the task has not ended yet: it ends at its next safe point. */
+  stopping?: boolean;
 }
 
 export interface TaskMonitorEvents {
@@ -116,6 +118,37 @@ export class TaskMonitor {
     this.emit();
     for (const task of fetched) if (task.status === "needs_approval") this.ask(task.id);
     return this.list();
+  }
+
+  /** The calls a waiting task asks about -- questions that may be on screen. */
+  pendingCalls(taskId: string): string[] {
+    return (this.tasks.get(taskId)?.pendingApproval ?? []).map((call) => call.id);
+  }
+
+  /**
+   * Stops a task. Running, it ends at its next safe point -- a moment -- and says so on its
+   * conversation's stream; until then it shows as stopping. Waiting on an approval, it is
+   * stopped now. Its files stay and it keeps its place.
+   */
+  async stopTask(taskId: string): Promise<void> {
+    const stopped = await this.api.request<BackgroundTask>("POST", `/background-tasks/${taskId}/stop`);
+    this.merge(stopped);
+    const task = this.tasks.get(taskId);
+    if (task && task.status === "running") task.stopping = true;
+    this.schedule();
+    this.emit();
+  }
+
+  /** Carries a stopped task on from where it stopped. */
+  async resumeTask(taskId: string): Promise<void> {
+    const resumed = await this.api.request<BackgroundTask>("POST", `/background-tasks/${taskId}/resume`);
+    // a stopped task is not live, so a read that says running would be taken for a stale one
+    const known = this.tasks.get(taskId);
+    if (known) known.status = "running";
+    this.merge(resumed);
+    if (resumed.conversationId) this.follow(resumed.conversationId);
+    this.schedule();
+    this.emit();
   }
 
   /** Answers what a task stopped to ask; it carries on on the server from where it stopped. */
@@ -275,7 +308,8 @@ export class TaskMonitor {
       task.pendingApproval = [];
       this.announced.add(task.id);
     } else {
-      task.status = event.status === "failed" ? "failed" : "done";
+      task.status = event.status === "failed" ? "failed" : event.status === "stopped" ? "stopped" : "done";
+      task.stopping = false;
       for (const step of task.steps) if (step.state === "running") step.state = "done";
     }
     this.tasks.set(task.id, task);
@@ -289,7 +323,7 @@ export class TaskMonitor {
         this.emit();
       })
       .catch(() => {});
-    if (event.state === "finished") this.announce(task);
+    if (event.state === "finished") this.finish(task);
   }
 
   private applyStep(tool: ToolActivity): boolean {
@@ -316,9 +350,19 @@ export class TaskMonitor {
     const wasLive = known !== undefined && live(known);
     // A read that left before the task ended can land after its task.finished: keep the end.
     if (known && !wasLive && live(fresh)) return;
-    this.tasks.set(fresh.id, { ...fresh, steps: known?.steps ?? [] });
+    this.tasks.set(fresh.id, {
+      ...fresh,
+      steps: known?.steps ?? [],
+      ...(known?.stopping && fresh.status === "running" ? { stopping: true } : {}),
+    });
     if (live(fresh)) this.announced.add(fresh.id);
-    else if (wasLive) this.announce(this.tasks.get(fresh.id)!);
+    else if (wasLive) this.finish(this.tasks.get(fresh.id)!);
+  }
+
+  /** A task seen running has ended. One the user stopped is not news: they pressed the button. */
+  private finish(task: TaskView): void {
+    if (task.status === "stopped") this.announced.delete(task.id);
+    else this.announce(task);
   }
 
   private announce(task: TaskView): void {

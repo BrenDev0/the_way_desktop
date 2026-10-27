@@ -34,7 +34,7 @@ export interface PendingToolCall {
 
 export type ConversationStatus = "idle" | "running" | "awaiting_client" | "paused" | "failed";
 
-export type PauseReason = "rate_limit" | "quota" | "timeout" | "provider_error" | "credentials" | "interrupted";
+export type PauseReason = "rate_limit" | "quota" | "timeout" | "provider_error" | "credentials" | "interrupted" | "stopped";
 
 /** Why a turn stopped short. Everything it did is kept; resuming carries on from there. */
 export interface TurnPause {
@@ -136,7 +136,8 @@ export interface ToolActivity {
 }
 
 /** needs_approval: stopped on a call only the user can approve; it carries on once they answer. */
-export type TaskStatus = "running" | "needs_approval" | "done" | "failed";
+/** "stopped": the user stopped it. It keeps its place and its files, and can be resumed. */
+export type TaskStatus = "running" | "needs_approval" | "done" | "failed" | "stopped";
 
 /** GET /background-tasks and /background-tasks/{id}: a task the user's agent started. */
 export interface BackgroundTask {

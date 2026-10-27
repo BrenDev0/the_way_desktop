@@ -175,6 +175,15 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
   });
   handle(CHANNELS.conversationsResume, (id) => services.turns.drive(requireText(id, "conversation")));
   handle(CHANNELS.conversationsRetry, (id) => services.turns.retry(requireText(id, "conversation")));
+  handle(CHANNELS.conversationsStop, async (id) => {
+    const conversationId = requireText(id, "conversation");
+    const open = services.turns.settling(conversationId);
+    const stopped = await services.turns.stop(conversationId);
+    // Questions about calls that will now never run come down -- after the stop, so the answer
+    // they would have posted cannot carry the turn on. A call approved now runs nothing.
+    for (const callId of open) services.approvals.answerCall(callId, { approved: false, feedback: "El usuario detuvo el trabajo." });
+    return stopped;
+  });
   handle(CHANNELS.conversationsRemove, async (id) => {
     await services.turns.remove(requireText(id, "conversation"));
   });

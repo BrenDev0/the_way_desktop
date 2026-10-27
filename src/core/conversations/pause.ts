@@ -29,6 +29,11 @@ export function pauseText(pause: TurnPause | null | undefined): { title: string;
         title: "El proveedor rechazó la clave de IA",
         body: "La clave es inválida, fue revocada o no tiene acceso a este modelo. Pide a Xplorers que la revise, y reanuda.",
       };
+    case "stopped":
+      return {
+        title: "Detuviste a AGENTIX",
+        body: "Pulsa Reanudar para que siga justo donde se quedó, o escribe lo que quieres que haga ahora.",
+      };
     case "interrupted":
       return {
         title: "El servidor se reinició a mitad del turno",

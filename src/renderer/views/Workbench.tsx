@@ -68,6 +68,8 @@ export function Workbench({ user, connected, onSignOut }: Props) {
   const [status, setStatus] = useState<Conversation | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  // Stop was pressed and the turn has not ended yet: it ends at the agent's next safe point
+  const [stopping, setStopping] = useState(false);
   // a turn under way that this window did not send -- the agent reporting a finished task
   const serverTurn = !sending && (status?.status === "running" || status?.status === "awaiting_client");
   const [folder, setFolder] = useState<string | null>(null);
@@ -256,6 +258,24 @@ export function Workbench({ user, connected, onSignOut }: Props) {
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [messages, status?.status, live]);
+
+  // the turn ended (stopped or not): the next one starts with the button ready again
+  useEffect(() => {
+    if (!sending && !serverTurn) setStopping(false);
+  }, [sending, serverTurn]);
+
+  /** STOP: ends the agent's work on the last message. What it did is kept and it is told, so a
+   *  later "sigue" (or REANUDAR) carries on from where it stopped. */
+  async function stop() {
+    if (!activeId || stopping) return;
+    setStopping(true);
+    try {
+      setStatus(await window.desktop.conversations.stop(activeId));
+    } catch {
+      setStopping(false);
+      setError("No se pudo detener. Inténtalo de nuevo.");
+    }
+  }
 
   async function open(conversation: Conversation) {
     setLive("");
@@ -736,6 +756,18 @@ export function Workbench({ user, connected, onSignOut }: Props) {
               VOZ {voice.on ? "ON" : "OFF"}
             </button>
           </div>
+          {(sending || serverTurn) && activeId && (
+            <button
+              type="button"
+              className="chat__stop"
+              onClick={() => void stop()}
+              disabled={stopping}
+              aria-label="Detener"
+              title="Detener a AGENTIX. Lo que ya hizo se conserva y puede seguir cuando quieras."
+            >
+              <span aria-hidden="true">■</span> {stopping ? "DETENIENDO…" : "DETENER"}
+            </button>
+          )}
           <button
             type="submit"
             className="chat__send"

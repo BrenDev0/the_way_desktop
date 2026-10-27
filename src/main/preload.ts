@@ -62,6 +62,7 @@ const desktop: DesktopBridge = {
     attach: (name, contentType, data) => ipcRenderer.invoke(CHANNELS.conversationsAttach, name, contentType, data) as Promise<Attachment>,
     resume: (id) => ipcRenderer.invoke(CHANNELS.conversationsResume, id) as Promise<Conversation>,
     retry: (id) => ipcRenderer.invoke(CHANNELS.conversationsRetry, id) as Promise<Conversation>,
+    stop: (id) => ipcRenderer.invoke(CHANNELS.conversationsStop, id) as Promise<Conversation>,
     remove: (id) => ipcRenderer.invoke(CHANNELS.conversationsRemove, id) as Promise<void>,
     onUpdate: (listener) => listen<Conversation>(CHANNELS.conversationsUpdate, listener),
     onText: (listener) => listen<TextEvent>(CHANNELS.conversationsText, listener),
@@ -119,6 +120,8 @@ const desktop: DesktopBridge = {
     review: () => ipcRenderer.send(CHANNELS.dockReview),
     show: (target) => ipcRenderer.send(CHANNELS.viewerShow, target),
     approve: (taskId, decisions) => ipcRenderer.invoke(CHANNELS.dockApprove, taskId, decisions) as Promise<void>,
+    stop: (taskId) => ipcRenderer.invoke(CHANNELS.dockStop, taskId) as Promise<void>,
+    resume: (taskId) => ipcRenderer.invoke(CHANNELS.dockResume, taskId) as Promise<void>,
     thumbnail: (project, path) =>
       ipcRenderer.invoke(CHANNELS.dockThumbnail, project, path) as Promise<{ data: Uint8Array; contentType: string } | null>,
     onOpenProject: (listener) => listen(CHANNELS.dockOpenProject, listener),

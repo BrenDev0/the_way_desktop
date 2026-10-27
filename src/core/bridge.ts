@@ -113,6 +113,9 @@ export interface DesktopBridge {
     /** Carries on a paused turn (a rate limit, a timeout...) from where it stopped, and
      *  resolves when it is over again. */
     retry(conversationId: string): Promise<Conversation>;
+    /** Stops the agent's work on the last message. Resolves with where the conversation stands;
+     *  a turn that was working ends a moment later, and the send in progress resolves with it. */
+    stop(conversationId: string): Promise<Conversation>;
     remove(conversationId: string): Promise<void>;
     onUpdate(listener: (conversation: Conversation) => void): Unsubscribe;
     /** The assistant's reply as it is written, a piece at a time. */
@@ -185,6 +188,10 @@ export interface DesktopBridge {
     show(target: ViewTarget): void;
     /** Answers what a task waits on, right from the strip: one decision for each call. */
     approve(taskId: string, decisions: { callId: string; approved: boolean; args?: Record<string, string> }[]): Promise<void>;
+    /** Stops a task: what it made stays and it keeps its place. */
+    stop(taskId: string): Promise<void>;
+    /** Carries a stopped task on from where it stopped. */
+    resume(taskId: string): Promise<void>;
     /** A small picture of an image the task made, for its tile. */
     thumbnail(project: string, path: string): Promise<{ data: Uint8Array; contentType: string } | null>;
     onOpenProject(listener: (target: { name: string; path: string | null }) => void): Unsubscribe;
@@ -240,6 +247,7 @@ export const CHANNELS = {
   conversationsSend: "conversations:send",
   conversationsAttach: "conversations:attach",
   conversationsResume: "conversations:resume",
+  conversationsStop: "conversations:stop",
   conversationsRetry: "conversations:retry",
   conversationsRemove: "conversations:remove",
   conversationsUpdate: "conversations:update",
@@ -259,6 +267,8 @@ export const CHANNELS = {
   voiceWarm: "voice:warm",
   dockTasks: "dock:tasks",
   dockTasksChanged: "dock:tasks-changed",
+  dockStop: "dock:stop",
+  dockResume: "dock:resume",
   dockDismiss: "dock:dismiss",
   dockInteractive: "dock:interactive",
   dockOpenProject: "dock:open-project",

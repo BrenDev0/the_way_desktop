@@ -120,6 +120,29 @@ export class TurnService {
     return this.drive(conversationId);
   }
 
+  /**
+   * The user pressed Stop. Working, the server ends the turn at its next safe point (a moment)
+   * and says so on the stream, which ends this drive; waiting on this machine, it ends at once.
+   * Either way what was done is kept and the agent is told. Nothing running is not an error.
+   */
+  async stop(conversationId: string): Promise<Conversation> {
+    try {
+      const stopped = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/stop`);
+      this.events.update(stopped);
+      return stopped;
+    } catch (error) {
+      // it ended by itself an instant before: there is nothing left to stop
+      if (!(error instanceof ApiError && error.code === "conversation_not_running")) throw error;
+      return this.api.request<Conversation>("GET", `/conversations/${conversationId}`);
+    }
+  }
+
+  /** The calls of this conversation being answered here right now -- questions that may be on
+   *  screen. After a stop they are taken down: nothing should run for a turn the user ended. */
+  settling(conversationId: string): string[] {
+    return [...(this.settlingCalls.get(conversationId) ?? [])];
+  }
+
   /** Carries on a paused turn from where it stopped (a rate limit, a timeout...), and
    *  follows it. Whatever it did before the pause is kept on the server. */
   async retry(conversationId: string): Promise<Conversation> {
@@ -250,11 +273,16 @@ export class TurnService {
     // seen again, the same answers are sent again -- never a second delete, never the same
     // approval asked twice.
     const unsettled = paused.pendingToolCalls.filter((call) => !this.settled.has(call.id));
+    this.settlingCalls.set(conversationId, unsettled.map((call) => call.id));
     // a turn picked up after a restart is a run of its own
     const run = this.runs.get(conversationId) ?? `${conversationId}:${++this.sent}`;
     this.runs.set(conversationId, run);
-    for (const resolution of await this.runner.resolveAll(unsettled, run)) {
-      this.settled.set(resolution.toolCallId, resolution);
+    try {
+      for (const resolution of await this.runner.resolveAll(unsettled, run)) {
+        this.settled.set(resolution.toolCallId, resolution);
+      }
+    } finally {
+      this.settlingCalls.delete(conversationId);
     }
     const resolutions = paused.pendingToolCalls.map((call) => this.settled.get(call.id)!);
 
@@ -277,6 +305,7 @@ export class TurnService {
   }
 
   private readonly settled = new Map<string, ToolResolution>();
+  private readonly settlingCalls = new Map<string, string[]>();
   /** Conversations whose current turn was spoken. */
   private readonly voice = new Set<string>();
   /** The run each conversation is on: one per message sent. */

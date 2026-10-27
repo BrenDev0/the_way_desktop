@@ -30,6 +30,9 @@ export class DockWindow {
   onReview: (() => void) | undefined;
   /** Answers a waiting task from the strip; set once the services exist. */
   onApprove: ((taskId: string, decisions: DockDecision[]) => Promise<void>) | undefined;
+  /** Stops or resumes a task from the strip; set once the services exist. */
+  onStop: ((taskId: string) => Promise<void>) | undefined;
+  onResume: ((taskId: string) => Promise<void>) | undefined;
   /** An image's bytes for a tile; set once the services exist. */
   onThumbnail: ((project: string, path: string) => Promise<{ data: Uint8Array; contentType: string } | null>) | undefined;
 
@@ -113,6 +116,16 @@ export class DockWindow {
         return [{ callId, approved: approved === true, args: picks }];
       });
       await this.onApprove?.(taskId, clean);
+    });
+    ipcMain.handle(CHANNELS.dockStop, async (event, taskId: unknown) => {
+      fromDock(event);
+      if (typeof taskId !== "string") throw new Error("Invalid task");
+      await this.onStop?.(taskId);
+    });
+    ipcMain.handle(CHANNELS.dockResume, async (event, taskId: unknown) => {
+      fromDock(event);
+      if (typeof taskId !== "string") throw new Error("Invalid task");
+      await this.onResume?.(taskId);
     });
     ipcMain.handle(CHANNELS.dockThumbnail, async (event, project: unknown, path: unknown) => {
       fromDock(event);

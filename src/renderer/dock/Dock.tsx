@@ -8,7 +8,7 @@ import "../views/files/files.css";
 import "./dock.css";
 
 /** What each tile's screen shows when it has no picture to show. */
-const MARK: Record<TaskView["status"], string> = { running: "▍", needs_approval: "?", done: "✓", failed: "✗" };
+const MARK: Record<TaskView["status"], string> = { running: "▍", needs_approval: "?", done: "✓", failed: "✗", stopped: "■" };
 
 /** "EN CURSO" as "En curso": only its first letter stays a capital. */
 const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
@@ -115,6 +115,15 @@ export function Dock() {
     if (finished(task)) setSeen((current) => new Set(current).add(task.id));
   }
 
+  /** Stops a task, or carries a stopped one on. The list says how it went. */
+  function stop(task: TaskView) {
+    void window.desktop.dock.stop(task.id).catch(() => {});
+  }
+
+  function resume(task: TaskView) {
+    void window.desktop.dock.resume(task.id).catch(() => {});
+  }
+
   function dismiss(task: TaskView) {
     if (openId === task.id) setOpenId(null);
     void window.desktop.dock.dismiss(task.id);
@@ -153,6 +162,19 @@ export function Dock() {
               onOpenFile={(target) => window.desktop.dock.show(target)}
             />
           </div>
+          {(open.status === "running" || open.status === "needs_approval") && (
+            <footer className="dock__card-foot">
+              <button type="button" className="ghost-button ghost-button--danger" onClick={() => stop(open)} disabled={open.stopping}>
+                {open.stopping ? "DETENIENDO…" : "DETENER"}
+              </button>
+            </footer>
+          )}
+          {open.status === "stopped" && (
+            <footer className="dock__card-foot">
+              <button type="button" className="ghost-button" onClick={() => resume(open)}>REANUDAR</button>
+              <button type="button" className="ghost-button ghost-button--danger" onClick={() => dismiss(open)}>DESCARTAR</button>
+            </footer>
+          )}
           {finished(open) && (
             <footer className="dock__card-foot">
               <button type="button" className="ghost-button ghost-button--danger" onClick={() => dismiss(open)}>DESCARTAR</button>

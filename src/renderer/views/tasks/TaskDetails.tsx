@@ -12,6 +12,7 @@ export const STATE: Record<TaskView["status"], string> = {
   needs_approval: "ESPERA TU APROBACIÓN",
   done: "LISTA",
   failed: "FALLÓ",
+  stopped: "DETENIDA",
 };
 
 export function ago(iso: string): string {
@@ -121,6 +122,9 @@ export function TaskDetails({ task, onOpenProject, onOpenConversation, onReview,
             </button>
           )}
         </div>
+      )}
+      {task.status === "stopped" && (
+        <p className="task__quiet">Detuviste esta tarea. Conserva lo que ya hizo: reanúdala cuando quieras y sigue donde se quedó.</p>
       )}
       {task.steps.length > 0 ? (
         route ? <Route steps={task.steps} running={task.status === "running"} /> : <StepList steps={task.steps} depth={0} />

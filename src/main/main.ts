@@ -143,6 +143,8 @@ const pausesTold = new Set<string>();
  *  banner with REANUDAR is already in the window; this gets them there. */
 function notifyPaused(conversation: Conversation) {
   if (conversation.status !== "paused") return;
+  // the user pressed Stop: they know
+  if (conversation.pause?.reason === "stopped") return;
   const key = `${conversation.id}:${conversation.pause?.pausedAt ?? ""}`;
   if (pausesTold.has(key)) return;
   pausesTold.add(key);
@@ -224,6 +226,14 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     const answered = decisions.some(({ callId, approved, args }) => approvals.answerCall(callId, { approved, args }));
     if (!answered) await tasks.refresh();
   };
+  // Stopped from the strip: a question the task was asking comes down unanswered, since the
+  // call it was about will now never run.
+  dock.onStop = async (taskId) => {
+    const open = tasks.pendingCalls(taskId);
+    await tasks.stopTask(taskId);
+    for (const callId of open) approvals.answerCall(callId, { approved: false, dismissed: true });
+  };
+  dock.onResume = (taskId) => tasks.resumeTask(taskId);
   dock.onThumbnail = async (project, path) => {
     const { project: found, file } = await findProjectFile(projects, project, path);
     // a tile is 52px: an image too big to send for that is not worth the wait

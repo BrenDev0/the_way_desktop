@@ -217,6 +217,11 @@
 .chat__send { flex: none; align-self: flex-end; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--accent-dim); border-radius: 6px; background: color-mix(in srgb, var(--accent) 6%, transparent); color: var(--accent); font: inherit; font-size: 18px; line-height: 1; text-shadow: var(--glow-accent); transition: background .15s, color .15s, box-shadow .15s, opacity .15s; }
 .chat__send:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); text-shadow: none; box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent); }
 .chat__send:disabled { border-color: var(--border-dim); background: transparent; color: var(--muted); text-shadow: none; opacity: .5; cursor: not-allowed; }
+/* Stop: only while the agent works. Beside the send button, in the warning colour, so it is never mistaken for it. */
+.chat__stop { flex: none; align-self: flex-end; height: 40px; padding: 0 14px; border: 1px solid var(--error); border-radius: 6px; background: transparent; color: var(--error); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .12em; transition: background .15s, color .15s; }
+.chat__stop:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 14%, transparent); color: var(--text-bright); }
+.chat__stop:disabled { opacity: .6; cursor: progress; }
+.chat__stop:focus-visible { outline: 1px dashed var(--error); outline-offset: 3px; }
 .chat__send:focus-visible { outline: 1px dashed var(--accent); outline-offset: 3px; }
 
 .chat__voice-controls { display: flex; flex-direction: column; gap: 6px; }

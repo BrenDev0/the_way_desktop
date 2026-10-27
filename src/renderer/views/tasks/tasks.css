@@ -8,6 +8,7 @@
 .task--running { border-left-color: var(--accent); }
 .task--done { border-left-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .task--failed { border-left-color: var(--error); }
+.task--stopped { border-left-color: var(--warn); }
 .task--needs_approval { border-left-color: var(--magenta); }
 .task--needs_approval .task__meta { color: var(--magenta); }
 .task__waiting { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--magenta-dim); border-radius: 4px; background: color-mix(in srgb, var(--magenta) 5%, transparent); }
