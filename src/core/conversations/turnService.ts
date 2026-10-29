@@ -1,5 +1,6 @@
 import {
   ApiError,
+  type ChatFolder,
   type ChatMessage,
   type Conversation,
   type ConversationEventsPort,
@@ -9,6 +10,7 @@ import {
   type ToolResolution,
 } from "../api";
 import type { SseEvent } from "../sse";
+import { folderError } from "./folders";
 import type { ToolRunner } from "../tools/runner";
 
 export interface TurnEvents {
@@ -100,6 +102,37 @@ export class TurnService {
 
   remove(conversationId: string): Promise<unknown> {
     return this.api.request("DELETE", `/conversations/${conversationId}`);
+  }
+
+  // The person's folders for their chats. Deleting one never deletes its chats.
+
+  folders(): Promise<ChatFolder[]> {
+    return this.api.request("GET", "/conversation-folders");
+  }
+
+  createFolder(name: string): Promise<ChatFolder> {
+    return this.api.request<ChatFolder>("POST", "/conversation-folders", { name }).catch((error) => {
+      throw folderError(error);
+    });
+  }
+
+  renameFolder(folderId: string, name: string): Promise<ChatFolder> {
+    return this.api.request<ChatFolder>("PATCH", `/conversation-folders/${folderId}`, { name }).catch((error) => {
+      throw folderError(error);
+    });
+  }
+
+  async removeFolder(folderId: string): Promise<void> {
+    await this.api.request("DELETE", `/conversation-folders/${folderId}`).catch((error) => {
+      throw folderError(error);
+    });
+  }
+
+  /** Files a chat in a folder, or (null) takes it out of its folder. */
+  move(conversationId: string, folderId: string | null): Promise<Conversation> {
+    return this.api.request<Conversation>("PATCH", `/conversations/${conversationId}/folder`, { folderId }).catch((error) => {
+      throw folderError(error);
+    });
   }
 
   /** `voice`: the reply will be spoken aloud, so the server asks for one written to be heard.

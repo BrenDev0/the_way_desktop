@@ -46,10 +46,19 @@ export interface TurnPause {
   retryAfter: string | null;
 }
 
+/** One of the person's own folders for their chats: one level, only theirs. */
+export interface ChatFolder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Conversation {
   id: string;
   title: string;
   client: "desktop" | "web";
+  /** The person's folder this chat is filed in; none: it is in the main list. */
+  folderId?: string | null;
   status: ConversationStatus;
   /** Set while status is "paused". */
   pause?: TurnPause | null;

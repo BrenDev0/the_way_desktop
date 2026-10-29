@@ -187,6 +187,16 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
   handle(CHANNELS.conversationsRemove, async (id) => {
     await services.turns.remove(requireText(id, "conversation"));
   });
+  handle(CHANNELS.conversationsFolders, () => services.turns.folders());
+  // a name may be anything typed (the server trims it and says why it will not do), but it must be text
+  handle(CHANNELS.conversationsCreateFolder, (name) => services.turns.createFolder(typeof name === "string" ? name : ""));
+  handle(CHANNELS.conversationsRenameFolder, (id, name) =>
+    services.turns.renameFolder(requireText(id, "folder"), typeof name === "string" ? name : ""),
+  );
+  handle(CHANNELS.conversationsRemoveFolder, (id) => services.turns.removeFolder(requireText(id, "folder")));
+  handle(CHANNELS.conversationsMove, (id, folderId) =>
+    services.turns.move(requireText(id, "conversation"), folderId === null ? null : requireText(folderId, "folder")),
+  );
 
   handle(CHANNELS.approvalsAuto, () => services.auto.enabled);
   handle(CHANNELS.approvalsSetAuto, (on) => {

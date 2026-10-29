@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { AuthState } from "../core/auth";
-import type { Attachment, ChatMessage, Conversation } from "../core/api";
+import type { Attachment, ChatFolder, ChatMessage, Conversation } from "../core/api";
 import {
   CHANNELS,
   type ActivityEvent,
@@ -64,6 +64,13 @@ const desktop: DesktopBridge = {
     retry: (id) => ipcRenderer.invoke(CHANNELS.conversationsRetry, id) as Promise<Conversation>,
     stop: (id) => ipcRenderer.invoke(CHANNELS.conversationsStop, id) as Promise<Conversation>,
     remove: (id) => ipcRenderer.invoke(CHANNELS.conversationsRemove, id) as Promise<void>,
+    folders: {
+      list: () => ipcRenderer.invoke(CHANNELS.conversationsFolders) as Promise<ChatFolder[]>,
+      create: (name) => ipcRenderer.invoke(CHANNELS.conversationsCreateFolder, name) as Promise<ChatFolder>,
+      rename: (id, name) => ipcRenderer.invoke(CHANNELS.conversationsRenameFolder, id, name) as Promise<ChatFolder>,
+      remove: (id) => ipcRenderer.invoke(CHANNELS.conversationsRemoveFolder, id) as Promise<void>,
+    },
+    move: (id, folderId) => ipcRenderer.invoke(CHANNELS.conversationsMove, id, folderId) as Promise<Conversation>,
     onUpdate: (listener) => listen<Conversation>(CHANNELS.conversationsUpdate, listener),
     onText: (listener) => listen<TextEvent>(CHANNELS.conversationsText, listener),
     onActivity: (listener) => listen<ActivityEvent>(CHANNELS.conversationsActivity, listener),

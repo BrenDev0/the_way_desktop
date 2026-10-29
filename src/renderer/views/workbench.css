@@ -199,10 +199,28 @@
 .convo__pick { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 7px 8px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; }
 .convo__item-title { overflow: hidden; color: var(--text-bright); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .convo__item-meta { display: flex; gap: 10px; color: var(--muted); font-size: 9px; }
-.convo__delete { flex: none; width: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; opacity: 0; }
-.convo__item:hover .convo__delete, .convo__item--cursor .convo__delete, .convo__delete:focus-visible { opacity: 1; }
-.convo__delete:hover:not(:disabled) { color: var(--error); }
-.convo__delete:disabled { cursor: not-allowed; }
+.convo__act { flex: none; width: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; opacity: 0; }
+.convo__item:hover .convo__act, .convo__item--cursor .convo__act, .convo__folder-row:hover .convo__act, .convo__act:focus-visible { opacity: 1; }
+.convo__act:hover:not(:disabled) { color: var(--accent); }
+.convo__act--danger:hover:not(:disabled) { color: var(--error); }
+.convo__act:disabled { cursor: not-allowed; }
+.convo__item--filed { margin-left: 14px; }
+.convo__folder { padding-top: 4px; }
+.convo__folder-row { display: flex; align-items: stretch; border-radius: 4px; }
+.convo__folder-toggle { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 0; background: transparent; color: var(--text-bright); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-align: left; }
+.convo__folder-toggle:hover { color: var(--accent); }
+.convo__folder-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.convo__folder-count { flex: none; margin-left: auto; color: var(--muted); font-size: 9px; font-weight: 400; }
+.convo__rule { padding: 10px 8px 3px; color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: .14em; }
+.convo__move { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--accent); border-radius: 4px; color: var(--text-bright); font-size: 11px; }
+.convo__move-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.convo__move .ghost-button, .convo__name .ghost-button { padding: 4px 9px; font-size: 9px; }
+.convo__name { display: flex; align-items: center; gap: 6px; }
+.convo__name input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--border-dim); border-radius: 4px; outline: none; background: var(--field); color: var(--text-bright); font: inherit; font-size: 11px; caret-color: var(--accent); user-select: text; }
+.convo__name input:focus { border-color: var(--accent); }
+.convo__name--foot { padding: 6px 12px; border-top: 1px solid var(--border-dim); }
+.convo__problem { flex: none; margin: 0; padding: 6px 12px; border-bottom: 1px solid var(--border-dim); color: var(--error); font-size: 11px; }
+.convo__foot { display: flex; flex: none; flex-direction: column; }
 .convo__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--error); border-radius: 4px; color: var(--text-bright); font-size: 11px; }
 .convo__confirm span { flex: 1 1 100%; }
 .convo__confirm .ghost-button { padding: 4px 9px; font-size: 9px; }

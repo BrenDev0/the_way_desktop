@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
-import type { Attachment, ChatMessage, Conversation, DesktopUser, TurnPause } from "../../core/api";
+import type { Attachment, ChatFolder, ChatMessage, Conversation, DesktopUser, TurnPause } from "../../core/api";
 import { pauseText, retryHint } from "../../core/conversations/pause";
 import type { ApprovalPrompt, ThemeChoice, WorkingPlace } from "../../core/bridge";
 import { useAppearance } from "../appearance";
@@ -62,6 +62,7 @@ const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000;
 
 export function Workbench({ user, connected, onSignOut }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [folders, setFolders] = useState<ChatFolder[]>([]);
   const { appearance, choose: chooseTheme } = useAppearance();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -132,7 +133,13 @@ export function Workbench({ user, connected, onSignOut }: Props) {
   const { replyText } = voice;
 
   const refreshList = useCallback(async () => {
-    setConversations(await window.desktop.conversations.list());
+    // the folders ride along; a list without them is still a list, so they never fail it
+    const [list, mine] = await Promise.all([
+      window.desktop.conversations.list(),
+      window.desktop.conversations.folders.list().catch(() => null),
+    ]);
+    setConversations(list);
+    if (mine) setFolders(mine);
   }, []);
 
   const refreshProjects = useCallback(async () => {
@@ -317,6 +324,30 @@ export function Workbench({ user, connected, onSignOut }: Props) {
     const created = await window.desktop.conversations.create("Nueva conversación");
     await refreshList();
     await open(created);
+  }
+
+  // The person's folders for their chats, from the picker. Each says why it failed, so the
+  // picker can show it; the list is read again after, since a folder changes what it looks like.
+
+  async function moveConversation(conversation: Conversation, folderId: string | null) {
+    await window.desktop.conversations.move(conversation.id, folderId);
+    await refreshList();
+  }
+
+  async function createFolder(name: string): Promise<ChatFolder> {
+    const folder = await window.desktop.conversations.folders.create(name);
+    await refreshList();
+    return folder;
+  }
+
+  async function renameFolder(folder: ChatFolder, name: string) {
+    await window.desktop.conversations.folders.rename(folder.id, name);
+    await refreshList();
+  }
+
+  async function removeFolder(folder: ChatFolder) {
+    await window.desktop.conversations.folders.remove(folder.id);
+    await refreshList();
   }
 
   /** From the picker. The one on screen going away leaves an empty chat, ready for a new one. */
@@ -660,10 +691,15 @@ export function Workbench({ user, connected, onSignOut }: Props) {
         <div className="chat__convo">
           <ConversationPicker
             conversations={conversations}
+            folders={folders}
             activeId={activeId}
             onOpen={(conversation) => void open(conversation)}
             onNew={() => void startNew()}
             onDelete={removeConversation}
+            onMove={moveConversation}
+            onCreateFolder={createFolder}
+            onRenameFolder={renameFolder}
+            onRemoveFolder={removeFolder}
           />
           <WorkPlacePicker
             place={place}

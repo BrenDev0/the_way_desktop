@@ -5,7 +5,7 @@
  */
 
 import type { AuthState } from "./auth";
-import type { Attachment, ChatMessage, Conversation, PendingToolCall, ToolActivity } from "./api";
+import type { Attachment, ChatFolder, ChatMessage, Conversation, PendingToolCall, ToolActivity } from "./api";
 import type { ServerConnectionPort } from "./connection";
 import type { TaskView } from "./tasks/taskMonitor";
 import type { ProjectRef, RemoteTree } from "./tools/ports";
@@ -117,6 +117,16 @@ export interface DesktopBridge {
      *  a turn that was working ends a moment later, and the send in progress resolves with it. */
     stop(conversationId: string): Promise<Conversation>;
     remove(conversationId: string): Promise<void>;
+    /** The person's own folders for their chats: one level, only theirs. Deleting one puts its
+     *  chats back in the main list. */
+    folders: {
+      list(): Promise<ChatFolder[]>;
+      create(name: string): Promise<ChatFolder>;
+      rename(folderId: string, name: string): Promise<ChatFolder>;
+      remove(folderId: string): Promise<void>;
+    };
+    /** Files a chat in a folder, or (null) takes it out of its folder. */
+    move(conversationId: string, folderId: string | null): Promise<Conversation>;
     onUpdate(listener: (conversation: Conversation) => void): Unsubscribe;
     /** The assistant's reply as it is written, a piece at a time. */
     onText(listener: (event: TextEvent) => void): Unsubscribe;
@@ -250,6 +260,11 @@ export const CHANNELS = {
   conversationsStop: "conversations:stop",
   conversationsRetry: "conversations:retry",
   conversationsRemove: "conversations:remove",
+  conversationsFolders: "conversations:folders",
+  conversationsCreateFolder: "conversations:create-folder",
+  conversationsRenameFolder: "conversations:rename-folder",
+  conversationsRemoveFolder: "conversations:remove-folder",
+  conversationsMove: "conversations:move",
   conversationsUpdate: "conversations:update",
   conversationsText: "conversations:text",
   conversationsActivity: "conversations:activity",
