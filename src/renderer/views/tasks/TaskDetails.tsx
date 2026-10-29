@@ -5,6 +5,7 @@ import type { TaskStep, TaskView } from "../../../core/tasks/taskMonitor";
 import { FileChips } from "../files/FileChips";
 import "../files/viewer.css";
 import { PLACES, detail, toolInfo } from "../chat/tools";
+import { failedTaskText } from "../../../core/tasks/failure";
 import "./tasks.css";
 
 export const STATE: Record<TaskView["status"], string> = {
@@ -139,7 +140,8 @@ export function TaskDetails({ task, onOpenProject, onOpenConversation, onReview,
           <FileChips files={files} onOpen={(target) => "local" in target || onOpenFile(target)} />
         </div>
       )}
-      {task.result && (
+      {task.status === "failed" && <p className="task__quiet">{failedTaskText(task.result)}</p>}
+      {task.status !== "failed" && task.result && (
         <details className="task__result">
           <summary>RESULTADO</summary>
           <pre className="selectable">{task.result}</pre>

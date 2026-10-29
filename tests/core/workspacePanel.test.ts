@@ -40,7 +40,7 @@ describe("ProjectTree", () => {
 describe("operatorMessage", () => {
   it("says server errors in the operator's words", () => {
     expect(operatorMessage(new ApiError(409, "project_name_taken", "taken"))).toBe("Ya tienes un proyecto con ese nombre.");
-    expect(operatorMessage(new ApiError(500, "something_new", "boom"))).toBe("El servidor no pudo completar la acción.");
+    expect(operatorMessage(new ApiError(500, "something_new", "boom"))).toBe("El servidor tuvo un problema. Inténtalo de nuevo en un momento.");
   });
 
   it("restates the agent-facing limits and tool errors", () => {

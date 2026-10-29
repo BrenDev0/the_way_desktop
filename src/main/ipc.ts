@@ -12,6 +12,7 @@ import type { ToolRunner } from "../core/tools/runner";
 import { contentTypeFor, downloadFromProject, findProjectFile, uploadToProject } from "../core/tools/transfer";
 import { checkFrom, failedCheck, type AppVersionAnswer } from "../core/update";
 import { LocalFilesError, type LocalFiles } from "../core/workspace/localFiles";
+import { FriendlyError, friendly } from "../core/userMessages";
 import { operatorMessage } from "../core/workspace/messages";
 import type { NodeFileSystem } from "./nodeFileSystem";
 import type { ProjectsApi } from "./projectsApi";
@@ -100,7 +101,7 @@ function forOperator<A extends unknown[], T>(run: (...args: A) => Promise<T>) {
     try {
       return await run(...args);
     } catch (error) {
-      throw new Error(operatorMessage(error));
+      throw new FriendlyError(operatorMessage(error));
     }
   };
 }
@@ -108,10 +109,17 @@ function forOperator<A extends unknown[], T>(run: (...args: A) => Promise<T>) {
 /** The window's handlers. Every one refuses a caller that is not the app's own window. */
 export function registerAppHandlers(services: AppServices, mainWindow: () => BrowserWindow | null) {
   function handle(channel: string, handler: (...args: unknown[]) => unknown) {
-    ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    ipcMain.handle(channel, async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
       const window = mainWindow();
       if (!window || event.sender !== window.webContents) throw new Error("Unknown window");
-      return handler(...args);
+      try {
+        return await handler(...args);
+      } catch (error) {
+        // What the window gets is said for the person, in Spanish, never the server's or a library's
+        // own words; the original stays here, in the console, for whoever is looking into it.
+        console.error(`[${channel}]`, error);
+        throw new FriendlyError(friendly(error));
+      }
     });
   }
 

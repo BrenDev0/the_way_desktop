@@ -912,9 +912,6 @@ function PauseBanner({ pause, onRetry }: { pause: TurnPause | null | undefined; 
     <div className="chat__notice chat__pause" role="alert">
       <div className="chat__pause-text">
         <strong>{title}.</strong> {body} {hint}
-        {pause?.detail && (pause.reason === "quota" || pause.reason === "credentials") && (
-          <span className="chat__pause-detail selectable">{pause.detail}</span>
-        )}
         <span className="chat__pause-safe">Todo lo que hizo AGENTIX hasta aquí está guardado.</span>
       </div>
       <button type="button" className="chat__pause-retry" onClick={onRetry}>
@@ -924,11 +921,7 @@ function PauseBanner({ pause, onRetry }: { pause: TurnPause | null | undefined; 
   );
 }
 
+/** Already said for the person by the time it gets here (core/userMessages). */
 function sendError(reason: unknown): string {
-  const text = reason instanceof Error ? reason.message : String(reason);
-  if (text.includes("api_key_not_configured") || text.includes("has not been set up")) {
-    return "El acceso a la IA de tu organización todavía no está habilitado. Escribe a Xplorers para activarlo.";
-  }
-  if (text.includes("conversation_busy") || text.includes("still working")) return "AGENTIX sigue trabajando en el mensaje anterior.";
-  return "No se pudo enviar el mensaje.";
+  return errorText(reason);
 }

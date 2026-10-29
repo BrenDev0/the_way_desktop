@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError, type ChatFolder, type Conversation, type ConversationEventsPort, type HttpMethod, type ServerApiPort } from "../../src/core/api";
 import { folderError } from "../../src/core/conversations/folders";
+import { GENERIC } from "../../src/core/userMessages";
 import { TurnService } from "../../src/core/conversations/turnService";
 import { ToolRunner } from "../../src/core/tools/runner";
 import { sectionsOf, visibleChats } from "../../src/renderer/views/chat/folders";
@@ -82,11 +83,10 @@ describe("the folders the server keeps for a person's chats", () => {
     await expect(service.createFolder("Otra")).rejects.toThrow(/hasta 50 carpetas/);
   });
 
-  it("leaves any other failure as it was", () => {
-    const other = new Error("offline");
-
-    expect(folderError(other)).toBe(other);
-    expect(folderError(new ApiError(500, "something_else", "boom")).message).toBe("boom");
+  it("never says the server's own words, whatever the failure", () => {
+    expect(folderError(new Error("offline")).message).toBe(GENERIC);
+    expect(folderError(new ApiError(404, "error", "The server answered 404.")).message).toBe("Eso ya no existe. Actualiza e inténtalo de nuevo.");
+    expect(folderError(new ApiError(500, "something_else", "boom")).message).toBe("El servidor tuvo un problema. Inténtalo de nuevo en un momento.");
   });
 });
 

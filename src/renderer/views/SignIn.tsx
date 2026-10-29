@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { DesktopUser } from "../../core/api";
+import { errorText } from "./files/helpers";
 
 interface Props {
   onSignedIn(user: DesktopUser): void;
@@ -60,10 +61,7 @@ export function SignIn({ onSignedIn }: Props) {
   );
 }
 
+/** Already said for the person by the time it gets here (core/userMessages). */
 function messageFor(reason: unknown): string {
-  const text = reason instanceof Error ? reason.message : String(reason);
-  if (text.includes("invalid_credentials") || text.includes("Incorrect email or password")) return "Correo o contraseña incorrectos.";
-  if (text.includes("login_rate_limited") || text.includes("Too many")) return "Demasiados intentos fallidos. Espera unos minutos e inténtalo de nuevo.";
-  if (text.includes("could not be reached") || text.includes("No server is connected")) return "No se pudo conectar con el servidor.";
-  return "No se pudo iniciar sesión. Inténtalo de nuevo.";
+  return errorText(reason);
 }

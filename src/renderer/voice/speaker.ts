@@ -12,7 +12,8 @@ export type Synthesize = (text: string, chunk: (pcm: Uint8Array) => void) => Pro
 const LEAD_SECONDS = 0.08;
 
 // The server's words for a missing or refused OpenAI key (voice/use_cases.py).
-const KEY_PROBLEM = /needs an OpenAI key|OpenAI key was rejected/i;
+// the two messages about the organization's OpenAI key (core/userMessages)
+const KEY_PROBLEM = /clave de OpenAI/i;
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

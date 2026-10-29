@@ -10,10 +10,18 @@ export function pipe(depth: number): { className?: string; style?: CSSProperties
   return depth > 0 ? { className: "tree__item", style: { "--depth": depth } as CSSProperties } : {};
 }
 
-/** Electron wraps a handler's error as "Error invoking remote method 'x': Error: <message>". */
+const IPC_ERROR = /^Error invoking remote method '[^']+':\s*(?:\w*Error:\s*)?/;
+const GENERIC = "No se pudo completar la acción. Inténtalo de nuevo.";
+
+/**
+ * What a failed call to the app says to the person. Electron wraps a handler's error as
+ * "Error invoking remote method 'x': Error: <message>", and the app's handlers only ever send
+ * Spanish written for the person (core/userMessages). Anything that did not come that way -- a
+ * bug in the window, a browser's own message -- is not for them, and is said generally.
+ */
 export function errorText(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
-  return text.replace(/^Error invoking remote method '[^']+':\s*(?:\w*Error:\s*)?/, "") || "No se pudo completar la acción.";
+  const text = error instanceof Error ? error.message : "";
+  return IPC_ERROR.test(text) ? text.replace(IPC_ERROR, "") || GENERIC : GENERIC;
 }
 
 export function formatSize(bytes: number): string {

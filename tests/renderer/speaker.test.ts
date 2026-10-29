@@ -131,7 +131,7 @@ describe("Speaker", () => {
     let calls = 0;
     const synthesize: Synthesize = async () => {
       calls += 1;
-      throw new Error("Your OpenAI key was rejected. Ask an owner or admin to issue a new one.");
+      throw new Error("La clave de OpenAI de tu organización fue rechazada. Escribe a Xplorers para que la reemplacen.");
     };
     const errors: unknown[] = [];
     const speaker = new Speaker(synthesize, () => {}, (error) => errors.push(error));
