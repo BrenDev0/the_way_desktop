@@ -92,6 +92,7 @@ const desktop: DesktopBridge = {
   },
   app: {
     update: () => ipcRenderer.invoke(CHANNELS.appUpdate) as Promise<UpdateCheck>,
+    installUpdate: () => ipcRenderer.invoke(CHANNELS.appInstallUpdate) as Promise<void>,
   },
   viewer: {
     project: (projectName, path) => ipcRenderer.invoke(CHANNELS.viewerProject, projectName, path) as Promise<ViewedFile>,

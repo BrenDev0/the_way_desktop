@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { describeCheck, type UpdateCheck } from "../../core/update";
+import { UpdateAction } from "./UpdateAction";
 
 /** The installed version, where it stands against what the server has published, and a button
  *  to ask again. Always there, so the person can see the check works even when there is
@@ -34,15 +35,7 @@ export function UpdateLine({ check, onCheck }: { check: UpdateCheck | null; onCh
       <p className="rail__version-text" role="status">
         {busy ? "Buscando actualizaciones…" : text}
       </p>
-      {!busy && update?.downloadPageUrl && (
-        <button
-          type="button"
-          className="ghost-button rail__version-download"
-          onClick={() => void window.desktop.links.open(update.downloadPageUrl!)}
-        >
-          DESCARGAR {update.latest}
-        </button>
-      )}
+      {!busy && update && <UpdateAction update={update} className="ghost-button rail__version-download" />}
     </div>
   );
 }

@@ -49,6 +49,10 @@ export const BY_CODE: Record<string, string> = {
   task_not_stopped: "Esa tarea no está detenida.",
   task_approval_expired: "La tarea esperó tu respuesta demasiado tiempo y se detuvo.",
 
+  // updating the app
+  installer_not_published: "Todavía no hay un instalador publicado para actualizar. Inténtalo más tarde.",
+  downloads_unavailable: "Las descargas no están disponibles en este momento. Inténtalo de nuevo en unos minutos.",
+
   // voice
   voice_key_not_configured: "La voz necesita una clave de OpenAI y tu organización aún no la tiene. Escribe a Xplorers para activarla.",
   voice_key_rejected: "La clave de OpenAI de tu organización fue rechazada. Escribe a Xplorers para que la reemplacen.",

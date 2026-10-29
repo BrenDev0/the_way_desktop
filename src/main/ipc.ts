@@ -10,9 +10,11 @@ import type { TaskMonitor } from "../core/tasks/taskMonitor";
 import { mustAsk, type AutoApprovals } from "../core/tools/autoApprovals";
 import type { ToolRunner } from "../core/tools/runner";
 import { contentTypeFor, downloadFromProject, findProjectFile, uploadToProject } from "../core/tools/transfer";
+import { installUpdate, type InstallerLink } from "../core/installUpdate";
 import { checkFrom, failedCheck, type AppVersionAnswer } from "../core/update";
 import { LocalFilesError, type LocalFiles } from "../core/workspace/localFiles";
 import { FriendlyError, friendly } from "../core/userMessages";
+import { NodeUpdater } from "./nodeUpdater";
 import { operatorMessage } from "../core/workspace/messages";
 import type { NodeFileSystem } from "./nodeFileSystem";
 import type { ProjectsApi } from "./projectsApi";
@@ -267,6 +269,26 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
       return checkFrom(answer, app.getVersion(), process.platform);
     } catch {
       return failedCheck(app.getVersion());
+    }
+  });
+
+  // The person pressed ACTUALIZAR (Windows): the new installer is downloaded, started, and this app
+  // quits for it. Once at a time. Whatever fails comes back as a message; the page stays an option.
+  const updater = new NodeUpdater(join(app.getPath("temp"), "the-way-update"));
+  let installing = false;
+  handle(CHANNELS.appInstallUpdate, async () => {
+    if (installing) return;
+    installing = true;
+    try {
+      await installUpdate(process.platform, {
+        link: () => services.api.request<InstallerLink>("GET", "/app/installer/windows"),
+        download: (url, filename) => updater.download(url, filename),
+        discard: (file) => updater.discard(file),
+        launch: (file) => updater.launch(file),
+        quit: () => app.quit(),
+      });
+    } finally {
+      installing = false;
     }
   });
 

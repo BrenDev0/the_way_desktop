@@ -165,6 +165,9 @@ export interface DesktopBridge {
     /** Asks the server for the latest published version of this installer and compares it
      *  with the running one. Never rejects: a server that cannot be asked is `failed`. */
     update(): Promise<UpdateCheck>;
+    /** Windows only: downloads the newer installer, starts it, and quits so it can replace this
+     *  app. Resolves only if it did not get that far; the app is gone when it works. */
+    installUpdate(): Promise<void>;
   };
   /** Speech through the server, on the user's OpenAI key. */
   voice: {
@@ -293,6 +296,7 @@ export const CHANNELS = {
   dockThumbnail: "dock:thumbnail",
   linksOpen: "links:open",
   appUpdate: "app:update",
+  appInstallUpdate: "app:install-update",
   viewerShow: "viewer:show",
   viewerProject: "viewer:project",
   viewerLocal: "viewer:local",

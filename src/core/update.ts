@@ -1,8 +1,8 @@
 /**
  * Whether a newer version of the app is out. The backend reports the latest published
  * version for each platform (written when an installer is published); the app compares
- * its own and, when it is behind, offers the download page. Nothing installs by itself:
- * the operator downloads the new installer and runs it.
+ * its own and, when it is behind, offers the update. On Windows the app can install it itself
+ * (core/installUpdate); elsewhere the person gets the download page and runs the installer.
  */
 
 export interface AppUpdate {
@@ -10,6 +10,8 @@ export interface AppUpdate {
   latest: string;
   /** The public download page, or null when the server does not know it. */
   downloadPageUrl: string | null;
+  /** This computer can download and install it from the app, with one press. */
+  canInstall: boolean;
 }
 
 export interface AppVersionAnswer {
@@ -42,7 +44,7 @@ export function updateFrom(answer: AppVersionAnswer, current: string, nodePlatfo
   const latest = platform ? answer.latest?.[platform] : null;
   if (!latest || !isNewer(latest, current)) return null;
   const page = answer.downloadPageUrl ?? null;
-  return { current, latest, downloadPageUrl: page && /^https:\/\//.test(page) ? page : null };
+  return { current, latest, downloadPageUrl: page && /^https:\/\//.test(page) ? page : null, canInstall: platform === "windows" };
 }
 
 /** What one check found, for the line in the window that shows the version and checks on

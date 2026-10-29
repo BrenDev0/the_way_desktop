@@ -305,3 +305,6 @@
 /* a newer version is out: the accent, not the warning colour -- it is news, not a problem */
 .chat__notice--update { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); color: var(--accent); }
 .chat__notice--update .ghost-button { flex: none; padding: 5px 10px; font-size: 10px; }
+.update-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.update-action__problem { flex: 1 1 100%; color: var(--error); font-size: 11px; text-align: right; }
+.update-action__busy { font-size: 11px; }

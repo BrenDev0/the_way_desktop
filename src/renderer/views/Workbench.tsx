@@ -8,6 +8,7 @@ import { transcript } from "../../core/conversations/transcript";
 import type { ProjectRef } from "../../core/tools/ports";
 import type { UpdateCheck } from "../../core/update";
 import { ApprovalDialog } from "./ApprovalDialog";
+import { UpdateAction } from "./UpdateAction";
 import { UpdateLine } from "./UpdateLine";
 import { ConversationPicker } from "./chat/ConversationPicker";
 import { WorkPlacePicker } from "./chat/WorkPlacePicker";
@@ -628,11 +629,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
         {update && (
           <p className="chat__notice chat__notice--update" role="status">
             <span>Hay una nueva versión de THE WAY ({update.latest}). Tienes la {update.current}.</span>
-            {update.downloadPageUrl && (
-              <button type="button" className="ghost-button" onClick={() => void window.desktop.links.open(update.downloadPageUrl!)}>
-                DESCARGAR
-              </button>
-            )}
+            <UpdateAction update={update} className="ghost-button" />
           </p>
         )}
         {missingTools.length > 0 && !update && (
