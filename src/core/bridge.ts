@@ -138,7 +138,7 @@ export interface DesktopBridge {
     respond(id: string, decision: ApprovalDecision): Promise<void>;
     /** Questions answered without the window (auto mode switched on): take them down. */
     onSettled(listener: (ids: string[]) => void): Unsubscribe;
-    /** Auto mode: approve everything except calls that must always ask (images). */
+    /** Auto mode: approve everything except calls that must always ask (images, videos). */
     auto(): Promise<boolean>;
     setAuto(on: boolean): Promise<boolean>;
     onAutoChanged(listener: (on: boolean) => void): Unsubscribe;

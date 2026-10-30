@@ -105,7 +105,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
   const [launches, setLaunches] = useState<Launch[]>([]);
   // the file open in the viewer, if any
   const [viewing, setViewing] = useState<ViewRequest | null>(null);
-  // auto mode: everything approved without asking, except images
+  // auto mode: everything approved without asking, except images and videos
   const [autoOn, setAutoOn] = useState(false);
   useEffect(() => {
     void window.desktop.approvals.auto().then(setAutoOn).catch(() => {});
@@ -617,7 +617,7 @@ export function Workbench({ user, connected, onSignOut }: Props) {
       >
         {autoOn && (
           <p className="chat__notice chat__notice--auto" role="status">
-            MODO AUTO · AGENTIX modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes.
+            MODO AUTO · AGENTIX modifica y mueve archivos, envía mensajes y usa el navegador sin preguntarte. Solo te pedirá permiso para eliminar algo y para generar imágenes o videos.
           </p>
         )}
         {offline && (
@@ -717,8 +717,8 @@ export function Workbench({ user, connected, onSignOut }: Props) {
               onClick={() => void window.desktop.approvals.setAuto(!autoOn).then(setAutoOn)}
               aria-pressed={autoOn}
               title={autoOn
-                ? "Modo auto activo: AGENTIX actúa sin pedir permiso, salvo para eliminar y generar imágenes. Clic para volver a preguntar."
-                : "Modo auto: aprobar todo sin preguntar, salvo eliminar y generar imágenes. Se apaga al cerrar la app."}
+                ? "Modo auto activo: AGENTIX actúa sin pedir permiso, salvo para eliminar y generar imágenes o videos. Clic para volver a preguntar."
+                : "Modo auto: aprobar todo sin preguntar, salvo eliminar y generar imágenes o videos. Se apaga al cerrar la app."}
             >
               {autoOn ? "⚡ AUTO ON" : "AUTO OFF"}
             </button>
@@ -854,6 +854,7 @@ const TYPES: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
   pdf: "application/pdf", txt: "text/plain", md: "text/markdown", csv: "text/csv", json: "application/json",
   html: "text/html", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm",
 };
 
 function guessType(name: string): string {

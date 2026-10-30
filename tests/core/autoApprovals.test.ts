@@ -40,8 +40,8 @@ describe("AutoApprovals", () => {
     expect(person.asked).toEqual(["GenerateImages", "DeleteDir", "SomethingNew"]);
   });
 
-  it("asks about images and deletions by name too, for a server that does not mark them", () => {
-    for (const name of ["EditImage", "GenerateImages", "DeleteFile", "DeleteDir", "DeleteProjectPath"]) {
+  it("asks about images, videos and deletions by name too, for a server that does not mark them", () => {
+    for (const name of ["EditImage", "GenerateImages", "GenerateVideo", "AnimateImage", "EditVideo", "DeleteFile", "DeleteDir", "DeleteProjectPath"]) {
       expect(mustAsk(call(name))).toBe(true);
     }
     expect(mustAsk(call("WriteProjectFile"))).toBe(false);

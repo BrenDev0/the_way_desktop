@@ -12,6 +12,9 @@ describe("producedFiles", () => {
     expect(
       producedFiles("Generated with Flare (gpt-image-2.5-flare):\n- saved Borradores/a.png (812 bytes)\n- b.png: FAILED -- no image"),
     ).toEqual([{ project: "Borradores", path: "a.png", kind: "file" }]);
+    expect(producedFiles("Made with Kling 4.0 (kling-4): saved Campaña/teaser.mp4 (4,812,330 bytes)")).toEqual([
+      { project: "Campaña", path: "teaser.mp4", kind: "file" },
+    ]);
   });
 
   it("follows a rename, move or copy to where the file landed", () => {
@@ -51,6 +54,8 @@ describe("viewKind", () => {
     expect(viewKind("application/octet-stream", "notes.md")).toBe("markdown");
     expect(viewKind("text/plain", "README.markdown")).toBe("markdown");
     expect(viewKind("text/plain", "notes.txt")).toBe("text");
+    expect(viewKind("video/mp4", "teaser.mp4")).toBe("video");
+    expect(viewKind("", "clip.mov")).toBe("video");
     expect(viewKind("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "a.docx")).toBe("other");
   });
 });

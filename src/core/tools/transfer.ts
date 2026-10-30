@@ -16,6 +16,7 @@ const TYPES: Record<string, string> = {
   js: "text/javascript", ts: "text/plain", json: "application/json", csv: "text/csv",
   svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
   webp: "image/webp", pdf: "application/pdf", zip: "application/zip",
+  mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };

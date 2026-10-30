@@ -25,13 +25,21 @@ const WHAT: Record<string, string> = {
   BuildSkill: "Crear o actualizar una habilidad de la organización",
   GenerateImages: "Generar imágenes",
   EditImage: "Editar una imagen",
+  GenerateVideo: "Generar un video",
+  AnimateImage: "Animar una imagen en video",
+  EditVideo: "Editar un video",
 };
 
-/** How each pickable value reads; anything unknown shows as itself. An edit runs the same
- *  two models through OpenAI's edit endpoint, so it names them as edits. */
+/** How each pickable value reads; anything unknown shows as itself. An image edit runs the
+ *  same two models through OpenAI's edit endpoint, so it names them as edits. */
 const OPTION: Record<string, { label: string; hint: string }> = {
   "gpt-image-2.5-flare": { label: "Flare", hint: "Rápido — buena calidad para el día a día" },
   "gpt-image-2.5-sunburst": { label: "Sunburst", hint: "Máximo detalle y estilo — más lento" },
+  "kling-4": { label: "Kling 4.0", hint: "La mejor calidad por su precio" },
+  "kling-3": { label: "Kling 3.0", hint: "El más económico — cualquier toma sin un avatar que hable" },
+  "seedance-2.5": { label: "Seedance 2.5", hint: "Realismo y varias escenas — hasta 30 s" },
+  "seedance-2.0": { label: "Seedance 2.0", hint: "Realismo y varias escenas" },
+  "kling-omni": { label: "Kling Omni", hint: "Cambia el video y conserva su movimiento" },
 };
 const EDIT_OPTION: Record<string, { label: string; hint: string }> = {
   "gpt-image-2.5-flare": { label: "Flare Edit", hint: "Rápido — ideal para ajustes en varias rondas" },
@@ -39,6 +47,7 @@ const EDIT_OPTION: Record<string, { label: string; hint: string }> = {
 };
 const IMAGE_TOOLS = new Set(["GenerateImages", "EditImage"]);
 const IMAGES_PER_APPROVAL = 10;
+const VIDEO_TOOLS = new Set(["GenerateVideo", "AnimateImage", "EditVideo"]);
 
 const CHOICE_LABEL: Record<string, string> = { model: "MODELO" };
 
@@ -105,6 +114,11 @@ export function ApprovalDialog({ prompt, onAnswer }: Props) {
           <p className="approval__covers">
             Esta aprobación cubre hasta {IMAGES_PER_APPROVAL} imágenes, generadas y editadas, en {origin ? "esta tarea" : "esta respuesta"}
             {" "}con el modelo que elijas: AGENTIX puede refinar el resultado en varias rondas sin volver a preguntarte.
+          </p>
+        )}
+        {VIDEO_TOOLS.has(call.name) && (
+          <p className="approval__covers">
+            Esta aprobación cubre solo este video: tarda unos minutos y cada video se aprueba por separado.
           </p>
         )}
         <label htmlFor="approval-feedback">SI LO RECHAZAS, ¿QUÉ DEBERÍA HACER EN SU LUGAR? (OPCIONAL)</label>

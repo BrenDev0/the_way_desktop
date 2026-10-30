@@ -4,7 +4,7 @@ import { viewKind } from "../../../core/files/produced";
 /** What the viewer is asked to open: a project file, or one in the open folder. */
 export type ViewRequest = { source: "project"; project: string; path: string } | { source: "local"; path: string };
 
-const GLYPH = { image: "▣", pdf: "▤", html: "◈", markdown: "¶", text: "≡", other: "◇" } as const;
+const GLYPH = { image: "▣", video: "▶", pdf: "▤", html: "◈", markdown: "¶", text: "≡", other: "◇" } as const;
 
 /** The files something produced, each a button that opens it. */
 export function FileChips({

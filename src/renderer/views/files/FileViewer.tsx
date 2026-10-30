@@ -10,7 +10,7 @@ import "./viewer.css";
 const MAX_TEXT_CHARS = 2_000_000;
 
 /**
- * Looks at a file without leaving the app: pictures, PDFs (Chromium's own viewer), HTML
+ * Looks at a file without leaving the app: pictures, videos, PDFs (Chromium's own viewer), HTML
  * pages, markdown (rendered as the chat renders replies, its source a click away) and
  * text. Anything else can be saved or handed to the program the system uses for it.
  *
@@ -52,7 +52,7 @@ export function FileViewer({ request, onClose }: { request: ViewRequest; onClose
 
   const kind = file ? viewKind(file.contentType, file.name) : null;
   const url = useMemo(() => {
-    if (!file || (kind !== "image" && kind !== "pdf")) return null;
+    if (!file || (kind !== "image" && kind !== "video" && kind !== "pdf")) return null;
     return URL.createObjectURL(new Blob([file.data.slice()], { type: kind === "pdf" ? "application/pdf" : file.contentType }));
   }, [file, kind]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
@@ -117,6 +117,7 @@ export function FileViewer({ request, onClose }: { request: ViewRequest; onClose
           {kind === "image" && url && (
             <img src={url} alt={name} className={actual ? "viewer__image viewer__image--actual" : "viewer__image"} onClick={() => setActual((value) => !value)} />
           )}
+          {kind === "video" && url && <video src={url} controls autoPlay className="viewer__video" aria-label={name} />}
           {kind === "pdf" && url && <iframe title={name} src={url} className="viewer__frame" />}
           {kind === "html" && <iframe title={name} srcDoc={text} sandbox="" className="viewer__frame viewer__frame--page" />}
           {(kind === "text" || (kind === "markdown" && source)) && <pre className="viewer__text selectable">{shown}</pre>}

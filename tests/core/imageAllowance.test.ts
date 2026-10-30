@@ -40,6 +40,22 @@ describe("ImageAllowance", () => {
     expect(person.asked).toBe(2);
   });
 
+  it("never lets a video through on an image approval", async () => {
+    const person = new Person({ approved: true, args: { model: SUNBURST } });
+    const allowance = new ImageAllowance(person);
+    const video: PendingToolCall = {
+      id: "v", name: "GenerateVideo", location: "server", requiresApproval: true, detail: null,
+      args: { prompt: "p", output_path: "a.mp4", model: "kling-4" }, alwaysAsk: true,
+    };
+
+    await allowance.request({ call: generate(1), run: "conv:1" });
+    await allowance.request({ call: video, run: "conv:1" });
+    await allowance.request({ call: video, run: "conv:1" });
+
+    expect(person.asked).toBe(3);
+    expect(imagesIn(video)).toBe(0);
+  });
+
   it("starts over on the next reply, and a refusal grants nothing", async () => {
     const yes = new Person({ approved: true });
     const allowance = new ImageAllowance(yes);

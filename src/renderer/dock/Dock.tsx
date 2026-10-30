@@ -19,7 +19,17 @@ const finished = (task: TaskView) => task.status === "done" || task.status === "
 const POWER_OFF_MS = 200;
 const GLITCH_MS = 900;
 
-const MODEL: Record<string, string> = { "gpt-image-2.5-flare": "Flare", "gpt-image-2.5-sunburst": "Sunburst" };
+const MODEL: Record<string, string> = {
+  "gpt-image-2.5-flare": "Flare",
+  "gpt-image-2.5-sunburst": "Sunburst",
+  "kling-4": "Kling 4.0",
+  "kling-3": "Kling 3.0",
+  "seedance-2.5": "Seedance 2.5",
+  "seedance-2.0": "Seedance 2.0",
+  "kling-omni": "Kling Omni",
+};
+const IMAGE_TOOLS = new Set(["GenerateImages", "EditImage"]);
+const VIDEO_TOOLS = new Set(["GenerateVideo", "AnimateImage", "EditVideo"]);
 
 /**
  * The strip on the screen edge, in THE WAY's own look: every background task is a small CRT
@@ -230,6 +240,9 @@ function DockApproval({ task }: { task: TaskView }) {
   const calls = task.pendingApproval ?? [];
   const [picks, setPicks] = useState<Record<string, string>>(() => Object.fromEntries(calls.map((call) => [call.id, modelOf(call)])));
   const [sent, setSent] = useState<"yes" | "no" | null>(null);
+  // what the task asks to spend on, so the note and the refusal say the right thing
+  const images = calls.some((call) => IMAGE_TOOLS.has(call.name));
+  const videos = calls.some((call) => VIDEO_TOOLS.has(call.name));
 
   async function answer(approved: boolean) {
     setSent(approved ? "yes" : "no");
@@ -268,10 +281,11 @@ function DockApproval({ task }: { task: TaskView }) {
           )}
         </div>
       ))}
-      <p className="dock-ask__covers">Cubre hasta 10 imágenes en esta tarea.</p>
+      {images && <p className="dock-ask__covers">Cubre hasta 10 imágenes en esta tarea.</p>}
+      {videos && <p className="dock-ask__covers">Cada video se aprueba por separado.</p>}
       <div className="dock-ask__answer">
         {sent ? (
-          <span className="dock-ask__sent">{sent === "yes" ? "❯ Aprobado · continuando…" : "❯ Rechazado · sigue sin imágenes"}</span>
+          <span className="dock-ask__sent">{sent === "yes" ? "❯ Aprobado · continuando…" : `❯ Rechazado · sigue sin ${images ? "imágenes" : videos ? "el video" : "eso"}`}</span>
         ) : (
           <>
             <button type="button" className="ghost-button" onClick={() => void answer(false)}>[ NO ]</button>

@@ -3,10 +3,10 @@ import type { ApprovalDecision, ApprovalPort, ApprovalRequest } from "./runner";
 
 /**
  * Tools that are always put to the user, by name -- for a server too old to mark them.
- * The server's own flag (alwaysAsk) is what normally decides. Images spend the user's
- * money; a deletion cannot be undone; a push leaves the machine.
+ * The server's own flag (alwaysAsk) is what normally decides. Images and videos spend the
+ * user's money; a deletion cannot be undone; a push leaves the machine.
  */
-const ALWAYS_ASK = new Set(["GenerateImages", "EditImage", "DeleteFile", "DeleteDir", "DeleteProjectPath", "GitPush", "RunCommand"]);
+const ALWAYS_ASK = new Set(["GenerateImages", "EditImage", "GenerateVideo", "AnimateImage", "EditVideo", "DeleteFile", "DeleteDir", "DeleteProjectPath", "GitPush", "RunCommand"]);
 
 export function mustAsk(call: PendingToolCall): boolean {
   return call.alwaysAsk === true || ALWAYS_ASK.has(call.name);
@@ -14,7 +14,7 @@ export function mustAsk(call: PendingToolCall): boolean {
 
 /**
  * Auto mode: every approval answered "yes" without asking, except the calls that must
- * always ask -- images and deletions. Off unless switched on, and off again each time the
+ * always ask -- images, videos and deletions. Off unless switched on, and off again each time the
  * app starts, so it is never left on by accident.
  */
 export class AutoApprovals implements ApprovalPort {

@@ -63,7 +63,7 @@ export function producedFiles(text: string | null | undefined): ProducedFile[] {
   });
 }
 
-export type ViewKind = "image" | "pdf" | "html" | "markdown" | "text" | "other";
+export type ViewKind = "image" | "video" | "pdf" | "html" | "markdown" | "text" | "other";
 
 const TEXT_TYPES = ["application/json", "application/xml", "text/"];
 
@@ -72,6 +72,7 @@ export function viewKind(contentType: string, name: string): ViewKind {
   const type = contentType.split(";")[0].trim().toLowerCase();
   const suffix = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   if (type.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(suffix)) return "image";
+  if (type.startsWith("video/") || ["mp4", "mov", "webm"].includes(suffix)) return "video";
   if (type === "application/pdf" || suffix === "pdf") return "pdf";
   if (type === "text/html" || suffix === "html" || suffix === "htm") return "html";
   if (type === "text/markdown" || suffix === "md" || suffix === "markdown") return "markdown";
