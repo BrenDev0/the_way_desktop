@@ -3,11 +3,14 @@
 # installed apps learn a newer version is out. The same thing, written the same way, as
 # `python -m src.downloads.publish` in the backend (src/downloads/config.py has the layout):
 #
-#   <prefix>/downloads/desktop/windows/THE-WAY-Setup.exe   then   .../windows/latest.json
-#   <prefix>/downloads/desktop/mac/THE-WAY-mac.zip         then   .../mac/latest.json
+#   <prefix>/downloads/desktop/windows/THE-WAY-Setup-<version>.exe   then   .../windows/latest.json
+#   <prefix>/downloads/desktop/mac/THE-WAY-mac-<version>.zip         then   .../mac/latest.json
 #
 # Each installer goes up BEFORE its latest.json: an app told about a version must find its
-# installer there. Publishing replaces what was published before; there is one of each.
+# installer there. The version is in the name it is stored under, because a browser saves a
+# download under its key's own name whatever the bucket does with a header. Once latest.json
+# says the new version, the newest KEEP_VERSIONS stay (so one can be rolled back to) and older
+# ones, and the file at the old fixed name (THE-WAY-Setup.exe), are removed.
 #
 # Usage: publish-installers.sh <version> <windows installer> <mac zip>
 #
@@ -46,8 +49,30 @@ base="downloads/desktop"
 
 s3() { aws "${aws_args[@]}" s3 "$@"; }
 
-publish() { # <platform> <file> <name it is saved as>
-  local platform="$1" file="$2" name="$3"
+# how many versions of each installer stay in the bucket, the newest first; keep in step with
+# KEEP_VERSIONS in the backend's src/downloads/config.py
+KEEP_VERSIONS=3
+
+prune() { # <platform> <stem> <suffix>: older versions, and the file at the old fixed name
+  local platform="$1" stem="$2" suffix="$3"
+  local folder="s3://$BUCKET_NAME/$base/$platform/"
+  local pattern="^${stem}-([0-9]+\.[0-9]+\.[0-9]+)${suffix//./\\.}\$"
+  local held found kept=0
+  held="$(s3 ls "$folder" | awk '{print $4}' | sed -nE "s/$pattern/\1/p" | sort -V -r)"
+  while IFS= read -r found; do
+    [ -n "$found" ] || continue
+    kept=$((kept + 1))
+    # the version just published is never removed, even when a higher number is already there
+    if [ "$kept" -gt "$KEEP_VERSIONS" ] && [ "$found" != "$version" ]; then
+      s3 rm --only-show-errors "$folder$stem-$found$suffix"
+    fi
+  done <<< "$held"
+  s3 rm --only-show-errors "$folder$stem$suffix" || true
+}
+
+publish() { # <platform> <file> <name without its version> <extension>
+  local platform="$1" file="$2" stem="$3" suffix="$4"
+  local name="$stem-$version$suffix"
   local record
   record="$(mktemp)"
   printf '{"version": "%s", "published_at": "%s"}' "$version" "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" > "$record"
@@ -60,8 +85,9 @@ publish() { # <platform> <file> <name it is saved as>
   local said
   said="$(s3 cp --only-show-errors "s3://$BUCKET_NAME/$base/$platform/latest.json" - | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p')"
   [ "$said" = "$version" ] || { echo "$platform: latest.json says $said, not $version" >&2; exit 1; }
+  prune "$platform" "$stem" "$suffix"
   echo "$platform $version published: $(wc -c < "$file" | tr -d ' ') bytes -> $BUCKET_NAME/$base/$platform/$name"
 }
 
-publish windows "$windows_file" "THE-WAY-Setup.exe"
-publish mac "$mac_file" "THE-WAY-mac.zip"
+publish windows "$windows_file" "THE-WAY-Setup" ".exe"
+publish mac "$mac_file" "THE-WAY-mac" ".zip"
