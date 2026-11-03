@@ -238,7 +238,7 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
   }));
 
   const projects = services.projects;
-  handle(CHANNELS.projectsList, forOperator(() => projects.projects()));
+  handle(CHANNELS.projectsList, forOperator(() => projects.visibleProjects()));
   handle(CHANNELS.projectsCreate, forOperator((name) => projects.createProject(requireText(name, "name").trim())));
   handle(CHANNELS.projectsTree, forOperator((id) => projects.tree(requireId(id, "project"))));
   handle(CHANNELS.projectsUpload, forOperator((localPath, project, destination) =>

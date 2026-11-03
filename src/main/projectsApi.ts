@@ -21,8 +21,19 @@ const TRANSFER_TIMEOUT = 10 * 60_000;
 export class ProjectsApi implements ProjectsApiPort {
   constructor(private readonly api: ServerApiPort) {}
 
+  /** Every project, the agent's own workspace (.the_way) too: what finds a project by name --
+   *  a transfer, a file opened from a task -- needs it, though the person never browses it. */
   async projects(): Promise<ProjectRef[]> {
-    const projects = await this.api.request<{ id: string; name: string }[]>("GET", "/projects");
+    return this.list("/projects?includeWorkspace=true");
+  }
+
+  /** The projects the window shows: the person's own. */
+  visibleProjects(): Promise<ProjectRef[]> {
+    return this.list("/projects");
+  }
+
+  private async list(path: string): Promise<ProjectRef[]> {
+    const projects = await this.api.request<{ id: string; name: string }[]>("GET", path);
     return projects.map(({ id, name }) => ({ id, name }));
   }
 
