@@ -12,21 +12,25 @@
 # says the new version, the newest KEEP_VERSIONS stay (so one can be rolled back to) and older
 # ones, and the file at the old fixed name (THE-WAY-Setup.exe), are removed.
 #
-# Usage: publish-installers.sh <version> <windows installer> <mac zip>
+# Usage: publish-installers.sh <windows|mac> <version> <installer>   (one platform per call)
 #
 # From the environment (the workflow's "production" environment):
 #   BUCKET_NAME, BUCKET_ACCESS_KEY_ID, BUCKET_SECRET_ACCESS_KEY      required
 #   BUCKET_ENDPOINT, BUCKET_REGION, BUCKET_PREFIX                    as the API has them
 set -euo pipefail
 
-version="${1:?usage: publish-installers.sh <version> <windows installer> <mac zip>}"
-windows_file="${2:?missing the Windows installer}"
-mac_file="${3:?missing the macOS zip}"
+platform="${1:?usage: publish-installers.sh <windows|mac> <version> <installer>}"
+version="${2:?missing the version}"
+installer="${3:?missing the installer}"
+
+case "$platform" in
+  windows) stem="THE-WAY-Setup"; suffix=".exe" ;;
+  mac) stem="THE-WAY-mac"; suffix=".zip" ;;
+  *) echo "Platform must be windows or mac: $platform" >&2; exit 1 ;;
+esac
 
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a version like 0.1.2: $version" >&2; exit 1; }
-for file in "$windows_file" "$mac_file"; do
-  [ -s "$file" ] || { echo "Missing or empty: $file" >&2; exit 1; }
-done
+[ -s "$installer" ] || { echo "Missing or empty: $installer" >&2; exit 1; }
 for name in BUCKET_NAME BUCKET_ACCESS_KEY_ID BUCKET_SECRET_ACCESS_KEY; do
   [ -n "${!name:-}" ] || { echo "$name is not set" >&2; exit 1; }
 done
@@ -89,5 +93,4 @@ publish() { # <platform> <file> <name without its version> <extension>
   echo "$platform $version published: $(wc -c < "$file" | tr -d ' ') bytes -> $BUCKET_NAME/$base/$platform/$name"
 }
 
-publish windows "$windows_file" "THE-WAY-Setup" ".exe"
-publish mac "$mac_file" "THE-WAY-mac" ".zip"
+publish "$platform" "$installer" "$stem" "$suffix"

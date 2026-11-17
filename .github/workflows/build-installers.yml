@@ -4,19 +4,20 @@
 #   Release:  bump the version, commit it, then push a tag that matches:
 #               npm version 0.1.2 --no-git-tag-version      (changes package.json and the lockfile)
 #               git commit -am "0.1.2" && git tag v0.1.2 && git push && git push --tags
-#             The tag builds both installers, then WAITS for your approval in the Actions tab
-#             before anything touches the bucket. The tag has to be v + package.json's version:
-#             the run refuses to start otherwise, before any build minutes are spent.
+#             The tag waits for your approval in the Actions tab (one dialog approves both
+#             builds), then each build uploads its installer straight to the bucket: no GitHub
+#             artifacts are used. The tag has to be v + package.json's version: the run refuses
+#             to start otherwise, before any build minutes are spent.
 #
-#   Build only:  Actions > Build desktop installers > Run workflow, choosing the branch. The
-#             installers are attached to the run; nothing is published, as it has always been.
+#   Build only:  Actions > Build desktop installers > Run workflow, choosing the branch. It
+#             builds and tests; nothing is saved or published.
 #
 # Publishing needs a GitHub Environment named "production" (Settings > Environments) with
 # "Required reviewers" set to you, holding:
 #   secrets    BUCKET_ACCESS_KEY_ID, BUCKET_SECRET_ACCESS_KEY
 #   variables  BUCKET_NAME, BUCKET_ENDPOINT, BUCKET_REGION, BUCKET_PREFIX
 # the same values the API runs with (a key limited to downloads/desktop/ is better, if the
-# bucket can make one). Only the publish job can read them. macOS minutes count ten times
+# bucket can make one). Only the tag builds can read them. macOS minutes count ten times
 # against the plan's allowance, which is why this never runs on an ordinary push.
 
 name: Build desktop installers
@@ -53,6 +54,7 @@ jobs:
     needs: version
     runs-on: windows-latest
     timeout-minutes: 30
+    environment: ${{ github.ref_type == 'tag' && 'production' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,18 +72,25 @@ jobs:
 
       - run: npm run make
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: THE-WAY-windows
-          path: out/make/squirrel.windows/x64/THE-WAY-Setup.exe
-          if-no-files-found: error
-          retention-days: 14
+      - name: Publish the Windows installer to the bucket
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: bash scripts/publish-installers.sh windows "$VERSION" out/make/squirrel.windows/x64/THE-WAY-Setup.exe
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+          BUCKET_ENDPOINT: ${{ vars.BUCKET_ENDPOINT }}
+          BUCKET_REGION: ${{ vars.BUCKET_REGION }}
+          BUCKET_PREFIX: ${{ vars.BUCKET_PREFIX }}
+          BUCKET_ACCESS_KEY_ID: ${{ secrets.BUCKET_ACCESS_KEY_ID }}
+          BUCKET_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_SECRET_ACCESS_KEY }}
 
   mac:
     name: macOS installer (Intel + Apple Silicon)
     needs: version
     runs-on: macos-latest
     timeout-minutes: 40
+    environment: ${{ github.ref_type == 'tag' && 'production' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -103,39 +112,10 @@ jobs:
           cp "$zip_file" THE-WAY-mac.zip
           ls -lh THE-WAY-mac.zip
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: THE-WAY-mac
-          path: THE-WAY-mac.zip
-          if-no-files-found: error
-          retention-days: 14
-
-  # Only for a pushed tag, and only once BOTH installers built. It pauses for approval: the
-  # "production" environment holds the bucket key and releases it to this job alone.
-  publish:
-    name: Publish to the bucket
-    if: github.ref_type == 'tag'
-    needs: [version, windows, mac]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: THE-WAY-windows
-          path: installers/windows
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: THE-WAY-mac
-          path: installers/mac
-
-      - name: Upload both installers, then the version each one is
-        run: >
-          bash scripts/publish-installers.sh "$VERSION"
-          installers/windows/THE-WAY-Setup.exe installers/mac/THE-WAY-mac.zip
+      - name: Publish the macOS installer to the bucket
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: bash scripts/publish-installers.sh mac "$VERSION" THE-WAY-mac.zip
         env:
           VERSION: ${{ needs.version.outputs.version }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
