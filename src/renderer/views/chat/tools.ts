@@ -46,6 +46,7 @@ const TOOLS: Record<string, [label: string, place: Place]> = {
   GenerateVideo: ["Generar video", "proyecto"],
   AnimateImage: ["Animar imagen en video", "proyecto"],
   EditVideo: ["Editar video", "proyecto"],
+  AddTextToVideo: ["Poner texto en video", "proyecto"],
   HtmlToPng: ["Convertir a imagen PNG", "proyecto"],
   StartBackgroundTask: ["Iniciar tarea en segundo plano", "agente"],
   CheckBackgroundTask: ["Revisar tarea en segundo plano", "agente"],
