@@ -305,6 +305,11 @@
 /* a newer version is out: the accent, not the warning colour -- it is news, not a problem */
 .chat__notice--update { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); color: var(--accent); }
 .chat__notice--update .ghost-button { flex: none; padding: 5px 10px; font-size: 10px; }
+.place__log-head { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--muted); }
+.place__log { max-height: 180px; margin: 6px 0 0; padding: 0; overflow-y: auto; list-style: none; font-size: 11px; line-height: 1.4; }
+.place__log li { display: flex; gap: 8px; padding: 3px 0; border-top: 1px solid var(--line, rgba(255,255,255,.08)); }
+.place__log-when { flex: none; color: var(--muted); }
+.place__log--failed { color: var(--error); }
 .update-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .update-action__problem { flex: 1 1 100%; color: var(--error); font-size: 11px; text-align: right; }
 .update-action__busy { font-size: 11px; }

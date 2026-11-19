@@ -6,6 +6,14 @@ export interface ComputerGrant {
   path: string;
 }
 
+export interface ComputerActivity {
+  at: string;
+  tool: string;
+  detail: string;
+  ok: boolean;
+  note?: string;
+}
+
 export function splitComputerPath(path: string): { label: string; rest: string } {
   const parts = path.replaceAll("\\", "/").split("/").filter((part) => part.trim() && part !== ".");
   if (parts.includes("..")) throw new ToolError(`Path '${path}' goes outside the granted folder`);

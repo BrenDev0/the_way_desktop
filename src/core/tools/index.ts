@@ -1,7 +1,7 @@
 import { browserTools } from "./browser";
 import type { ToolRegistry } from "./contract";
 import { commandTools } from "./command";
-import { computerTools } from "./computer";
+import { computerTools, type ComputerAudit } from "./computer";
 import { fileTools } from "./files";
 import { gitTools } from "./git";
 import type { BrowserPort, CommandPort, ComputerPort, FileSystemPort, GitPort, ProjectsApiPort } from "./ports";
@@ -14,6 +14,7 @@ export interface ToolDependencies {
   git: GitPort;
   command: CommandPort;
   computer: ComputerPort;
+  audit?: ComputerAudit;
 }
 
 /** Every desktop tool this build implements, bound to the machine it runs on. */
@@ -24,6 +25,6 @@ export function desktopTools(dependencies: ToolDependencies): ToolRegistry {
     ...browserTools(dependencies.browser),
     ...gitTools(dependencies.git, dependencies.files),
     ...commandTools(dependencies.command),
-    ...computerTools(dependencies.computer),
+    ...computerTools(dependencies.computer, dependencies.audit),
   };
 }

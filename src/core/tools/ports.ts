@@ -11,12 +11,15 @@ export interface FileInfo {
   exists: boolean;
   isDirectory: boolean;
   size: number;
+  /** Kept in the cloud, not on this computer: opening it would download it. */
+  cloudOnly?: boolean;
 }
 
 export interface DirectoryEntry {
   name: string;
   isDirectory: boolean;
   size: number;
+  cloudOnly?: boolean;
 }
 
 export interface WalkEntry {
@@ -24,6 +27,7 @@ export interface WalkEntry {
   path: string;
   isDirectory: boolean;
   size: number;
+  cloudOnly?: boolean;
 }
 
 export interface FileSystemPort {

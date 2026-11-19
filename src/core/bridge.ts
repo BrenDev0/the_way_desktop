@@ -12,7 +12,7 @@ import type { ProjectRef, RemoteTree } from "./tools/ports";
 import type { ApprovalDecision } from "./tools/runner";
 import type { DownloadResult, UploadResult } from "./tools/transfer";
 import type { UpdateCheck } from "./update";
-import type { ComputerGrant } from "./computer/access";
+import type { ComputerActivity, ComputerGrant } from "./computer/access";
 import type { LocalEntry } from "./workspace/localFiles";
 
 export interface ApprovalPrompt {
@@ -95,6 +95,9 @@ export interface DesktopBridge {
     /** Opens the folder picker; the grants after it. */
     add(): Promise<ComputerGrant[]>;
     remove(id: string): Promise<ComputerGrant[]>;
+    /** What the agent did on this computer, newest first. */
+    log(): Promise<ComputerActivity[]>;
+    clearLog(): Promise<ComputerActivity[]>;
   };
   workspace: {
     /** The folder the local file tools work in, or null before one is chosen. */
@@ -263,6 +266,8 @@ export const CHANNELS = {
   computerGrants: "computer:grants",
   computerGrantAdd: "computer:grant-add",
   computerGrantRemove: "computer:grant-remove",
+  computerLog: "computer:log",
+  computerLogClear: "computer:log-clear",
   workspaceCurrent: "workspace:current",
   workspaceChoose: "workspace:choose",
   workspacePlace: "workspace:place",

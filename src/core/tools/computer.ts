@@ -1,3 +1,5 @@
+import type { ComputerActivity } from "../computer/access";
+import { cloudOnlyMessage } from "../computer/cloud";
 import { foldText, hasAllTerms, rawTermsOf, snippetOf, termsOf, TEXT_FILE } from "../computer/search";
 import { flag, optionalText, text, ToolError, type ToolArgs, type ToolRegistry } from "./contract";
 import { IGNORED_DIRS } from "./files";
@@ -6,6 +8,8 @@ import { decodeText } from "./text";
 
 const SEARCH_LIMIT = 50;
 const TEXT_SEARCH_LIMIT = 30;
+const SMALL_FOLDER_ENTRIES = 5_000;
+const SMALL_FOLDER_BYTES = 50 * 1024 * 1024;
 const MAX_SCANNED = 300_000;
 const MAX_SCAN_BYTES = 300 * 1024 * 1024;
 const MAX_READ_BYTES = 2_000_000;
@@ -14,6 +18,10 @@ const PAGE_CHARS = 40_000;
 const CACHED_DOCUMENTS = 3;
 const DOCUMENT = /\.(pdf|docx|xlsx)$/i;
 const INDEX_NOTE = "From the system index, which can miss files it has not indexed yet; set thorough=true to scan every folder.";
+
+const CLOUD = "only in the cloud";
+
+export type ComputerAudit = (entry: Omit<ComputerActivity, "at">) => void;
 
 const bytes = (n: number) => n.toLocaleString("en-US");
 const ignored = (path: string) => path.split("/").some((part) => IGNORED_DIRS.has(part));
@@ -26,7 +34,17 @@ function pageOf(text: string, offset: number): string {
   return `${text.slice(offset, end)}\n\n[characters ${bytes(offset)}-${bytes(end)} of ${bytes(text.length)}${more}]`;
 }
 
-export function computerTools(computer: ComputerPort): ToolRegistry {
+function detailOf(name: string, args: ToolArgs): string {
+  const path = typeof args.path === "string" ? args.path : "";
+  const where = path ? ` in ${path}` : "";
+  if (name === "RequestComputerAccess") return String(args.reason ?? "");
+  if (name === "ListComputerFolder") return path || "(the granted folders)";
+  if (name === "SearchComputer" || name === "SearchComputerText") return `"${String(args.query ?? "")}"${where}`;
+  const offset = typeof args.offset === "number" && args.offset > 0 ? ` (from character ${args.offset})` : "";
+  return `${path}${offset}`;
+}
+
+export function computerTools(computer: ComputerPort, audit?: ComputerAudit): ToolRegistry {
   const documents = new Map<string, string>();
 
   async function targetsOf(args: ToolArgs): Promise<{ wanted: string; targets: string[] }> {
@@ -61,7 +79,7 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     const entries = [...(await computer.list(path))].sort(
       (a, b) => Number(!a.isDirectory) - Number(!b.isDirectory) || a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
     );
-    const lines = entries.map((e) => (e.isDirectory ? `${e.name}/` : `${e.name}  (${bytes(e.size)} bytes)`));
+    const lines = entries.map((e) => (e.isDirectory ? `${e.name}/` : `${e.name}  (${bytes(e.size)} bytes${e.cloudOnly ? `, ${CLOUD}` : ""})`));
     return lines.join("\n") || "(empty folder)";
   }
 
@@ -74,31 +92,34 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     const { wanted, targets } = await targetsOf(args);
     if (targets.length === 0) return "No folder has been granted yet. Ask the user with RequestComputerAccess.";
 
-    const hits: { nameHits: number; path: string; isDirectory: boolean }[] = [];
-    const add = (path: string, isDirectory: boolean) => {
+    const hits = new Map<string, { nameHits: number; path: string; isDirectory: boolean; cloudOnly: boolean }>();
+    const add = (path: string, isDirectory: boolean, cloudOnly = false) => {
+      if (hits.has(path)) return;
       const name = foldText(path.split("/").pop()!);
-      hits.push({ nameHits: terms.filter((t) => name.includes(t)).length, path, isDirectory });
+      hits.set(path, { nameHits: terms.filter((t) => name.includes(t)).length, path, isDirectory, cloudOnly });
     };
     let scanned = 0;
     let cut = false;
     let viaIndex = false;
     for (const target of targets) {
-      if (!thorough) {
-        const found = await computer.indexed(target, rawTermsOf(query), "name", signal);
-        if (found?.length) {
-          viaIndex = true;
-          for (const entry of found) if (!ignored(entry.path)) add(entry.path, entry.isDirectory);
-          continue;
-        }
-      }
+      let inTarget = 0;
+      let asked = false;
       for await (const entry of computer.walk(target, (name) => !IGNORED_DIRS.has(name), signal)) {
         signal?.throwIfAborted();
         scanned += 1;
+        inTarget += 1;
         if (scanned > MAX_SCANNED) {
           cut = true;
           break;
         }
-        if (hasAllTerms(entry.path, terms)) add(entry.path, entry.isDirectory);
+        if (hasAllTerms(entry.path, terms)) add(entry.path, entry.isDirectory, entry.cloudOnly);
+        if (thorough || asked || inTarget <= SMALL_FOLDER_ENTRIES) continue;
+        asked = true;
+        const indexed = await computer.indexed(target, rawTermsOf(query), "name", signal);
+        if (!indexed?.length) continue;
+        viaIndex = true;
+        for (const hit of indexed) if (!ignored(hit.path)) add(hit.path, hit.isDirectory, hit.cloudOnly);
+        break;
       }
       if (cut) break;
     }
@@ -107,12 +128,12 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
       cut ? `Stopped after ${bytes(MAX_SCANNED)} entries; narrow it with 'path'.` : "",
       viaIndex ? INDEX_NOTE : "",
     ].filter(Boolean);
-    if (hits.length === 0) {
+    if (hits.size === 0) {
       return [`Nothing matches all of [${terms.join(", ")}] in ${wanted || "the granted folders"} (searched ${bytes(scanned)} entries).`, ...notes].join(" ");
     }
-    hits.sort((a, b) => b.nameHits - a.nameHits || a.path.length - b.path.length || a.path.localeCompare(b.path));
-    const lines = hits.slice(0, SEARCH_LIMIT).map((h) => (h.isDirectory ? `${h.path}/` : h.path));
-    if (hits.length > SEARCH_LIMIT) lines.push(`... and ${hits.length - SEARCH_LIMIT} more; narrow the query or set 'path'`);
+    const ranked = [...hits.values()].sort((a, b) => b.nameHits - a.nameHits || a.path.length - b.path.length || a.path.localeCompare(b.path));
+    const lines = ranked.slice(0, SEARCH_LIMIT).map((h) => (h.isDirectory ? `${h.path}/` : h.cloudOnly ? `${h.path}  (${CLOUD})` : h.path));
+    if (ranked.length > SEARCH_LIMIT) lines.push(`... and ${ranked.length - SEARCH_LIMIT} more; narrow the query or set 'path'`);
     return [...lines, ...notes].join("\n");
   }
 
@@ -125,46 +146,67 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     const { wanted, targets } = await targetsOf(args);
     if (targets.length === 0) return "No folder has been granted yet. Ask the user with RequestComputerAccess.";
 
-    const found: { path: string; size: number; line?: { line: number; text: string } | null }[] = [];
+    type Found = { path: string; size: number; cloudOnly?: boolean; line?: { line: number; text: string } | null };
+    const found = new Map<string, Found>();
+    const addFound = (hit: Found) => {
+      const known = found.get(hit.path);
+      if (!known) found.set(hit.path, hit);
+      else if (hit.line && !known.line) known.line = hit.line;
+    };
     let scanned = 0;
+    let skippedCloud = 0;
     let readBytes = 0;
     let cut = false;
     let viaIndex = false;
     for (const target of targets) {
-      let indexed: WalkEntry[] | null = null;
-      if (!thorough) indexed = await computer.indexed(target, rawTermsOf(query), "content", signal);
-      if (indexed?.length) {
-        viaIndex = true;
-        for (const entry of indexed) if (!entry.isDirectory && !ignored(entry.path)) found.push({ path: entry.path, size: entry.size });
-        continue;
+      let trusted = false;
+      if (!thorough) {
+        const indexed = await computer.indexed(target, rawTermsOf(query), "content", signal);
+        if (indexed?.length) {
+          viaIndex = true;
+          trusted = true;
+          for (const entry of indexed) {
+            if (!entry.isDirectory && !ignored(entry.path)) addFound({ path: entry.path, size: entry.size, cloudOnly: entry.cloudOnly });
+          }
+        }
       }
+      let inTarget = 0;
+      let bytesInTarget = 0;
       for await (const entry of computer.walk(target, (name) => !IGNORED_DIRS.has(name), signal)) {
         signal?.throwIfAborted();
         scanned += 1;
+        inTarget += 1;
         if (scanned > MAX_SCANNED) {
           cut = true;
           break;
         }
+        if (trusted && (inTarget > SMALL_FOLDER_ENTRIES || bytesInTarget > SMALL_FOLDER_BYTES)) break;
         if (entry.isDirectory || !TEXT_FILE.test(entry.path) || entry.size > MAX_READ_BYTES) continue;
+        if (entry.cloudOnly) {
+          skippedCloud += 1;
+          continue;
+        }
         if (readBytes + entry.size > MAX_SCAN_BYTES) {
           cut = true;
           break;
         }
         readBytes += entry.size;
+        bytesInTarget += entry.size;
         let content: string;
         try {
           content = decodeText(await computer.readBytes(entry.path), entry.path);
         } catch {
           continue;
         }
-        if (hasAllTerms(content, terms)) found.push({ path: entry.path, size: entry.size, line: snippetOf(content, terms) });
+        if (hasAllTerms(content, terms)) addFound({ path: entry.path, size: entry.size, line: snippetOf(content, terms) });
       }
       if (cut) break;
     }
 
-    const shown = found.slice(0, TEXT_SEARCH_LIMIT);
+    const all = [...found.values()];
+    const shown = all.slice(0, TEXT_SEARCH_LIMIT);
     for (const hit of shown) {
-      if (hit.line !== undefined || !TEXT_FILE.test(hit.path) || hit.size > MAX_READ_BYTES) continue;
+      if (hit.line !== undefined || hit.cloudOnly || !TEXT_FILE.test(hit.path) || hit.size > MAX_READ_BYTES) continue;
       signal?.throwIfAborted();
       try {
         hit.line = snippetOf(decodeText(await computer.readBytes(hit.path), hit.path), terms);
@@ -176,16 +218,18 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     const notes = [
       cut ? `Stopped after ${bytes(scanned)} entries or ${bytes(MAX_SCAN_BYTES)} bytes read; narrow it with 'path'.` : "",
       viaIndex ? INDEX_NOTE : "",
+      skippedCloud ? `${skippedCloud} text file(s) stored ${CLOUD} were not opened, because opening them would download them.` : "",
       "Only text files are read when scanning; PDF, Word and Excel are found through the index when it has them, and opened with ReadComputerFile.",
     ].filter(Boolean);
-    if (found.length === 0) {
+    if (all.length === 0) {
       return [`No file contains all of [${terms.join(", ")}] in ${wanted || "the granted folders"} (read ${bytes(scanned)} entries).`, ...notes].join(" ");
     }
     const lines = shown.map((hit) => {
       if (hit.line) return `${hit.path}:${hit.line.line}: ${hit.line.text}`;
+      if (hit.cloudOnly) return `${hit.path}  (${CLOUD})`;
       return DOCUMENT.test(hit.path) ? `${hit.path}  (document)` : hit.path;
     });
-    if (found.length > TEXT_SEARCH_LIMIT) lines.push(`... and ${found.length - TEXT_SEARCH_LIMIT} more files; add words or set 'path'`);
+    if (all.length > TEXT_SEARCH_LIMIT) lines.push(`... and ${all.length - TEXT_SEARCH_LIMIT} more files; add words or set 'path'`);
     return [...lines, ...notes].join("\n");
   }
 
@@ -194,6 +238,7 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     const info = await computer.stat(path);
     if (!info.exists) throw new ToolError(`File does not exist: ${path}`);
     if (info.isDirectory) throw new ToolError(`'${path}' is a folder, not a file. Use ListComputerFolder`);
+    if (info.cloudOnly) throw new ToolError(cloudOnlyMessage(path));
     const offset = args.offset === undefined || args.offset === null ? 0 : args.offset;
     if (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0) throw new ToolError("'offset' must be a whole number, 0 or more");
 
@@ -220,11 +265,23 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     return pageOf(decodeText(await computer.readBytes(path), path), offset);
   }
 
+  const audited = (name: string, run: (args: ToolArgs, signal?: AbortSignal) => Promise<string>) => async (args: ToolArgs, signal?: AbortSignal) => {
+    try {
+      const output = await run(args, signal);
+      audit?.({ tool: name, detail: detailOf(name, args), ok: true });
+      return output;
+    } catch (error) {
+      const note = signal?.aborted ? "stopped by the user" : error instanceof Error ? error.message : String(error);
+      audit?.({ tool: name, detail: detailOf(name, args), ok: false, note });
+      throw error;
+    }
+  };
+
   return {
-    RequestComputerAccess: { run: requestAccess, preview: async (args) => `Motivo: ${optionalText(args, "reason", "")}` },
-    ListComputerFolder: { run: listFolder },
-    SearchComputer: { run: search },
-    SearchComputerText: { run: searchText },
-    ReadComputerFile: { run: read },
+    RequestComputerAccess: { run: audited("RequestComputerAccess", requestAccess), preview: async (args) => `Motivo: ${optionalText(args, "reason", "")}` },
+    ListComputerFolder: { run: audited("ListComputerFolder", listFolder) },
+    SearchComputer: { run: audited("SearchComputer", search) },
+    SearchComputerText: { run: audited("SearchComputerText", searchText) },
+    ReadComputerFile: { run: audited("ReadComputerFile", read) },
   };
 }

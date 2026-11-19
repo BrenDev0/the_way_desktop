@@ -1,9 +1,11 @@
 import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isSensitive, PROTECTED, splitComputerPath } from "../core/computer/access";
+import { cloudOnlyMessage, isCloudOnly } from "../core/computer/cloud";
 import { ToolError } from "../core/tools/contract";
 import type { ComputerPort, DirectoryEntry, FileInfo, WalkEntry } from "../core/tools/ports";
 import type { ComputerGrants } from "./computerGrants";
+import type { ComputerLog } from "./computerLog";
 import type { SearchKind, SystemSearch } from "./systemSearch";
 
 const MAX_INDEXED = 500;
@@ -14,13 +16,27 @@ const MAX_INDEXED = 500;
  * location -- symlinks followed -- must stay inside that grant, and credentials and keys are
  * neither listed, walked nor read.
  */
+export interface NodeComputerOptions {
+  system?: SystemSearch | null;
+  log?: ComputerLog | null;
+  cloudOnly?: (size: number, blocks: number | undefined) => boolean;
+}
+
 export class NodeComputer implements ComputerPort {
+  private readonly system: SystemSearch | null;
+  private readonly log: ComputerLog | null;
+  private readonly cloudOnly: (size: number, blocks: number | undefined) => boolean;
+
   constructor(
     private readonly store: ComputerGrants,
     private readonly pick: (reason: string) => Promise<string | null>,
     private readonly extract: (name: string, data: Uint8Array) => Promise<string>,
-    private readonly system: SystemSearch | null = null,
-  ) {}
+    options: NodeComputerOptions = {},
+  ) {
+    this.system = options.system ?? null;
+    this.log = options.log ?? null;
+    this.cloudOnly = options.cloudOnly ?? isCloudOnly;
+  }
 
   async grants(): Promise<{ label: string }[]> {
     return (await this.store.list()).map(({ label }) => ({ label }));
@@ -30,6 +46,7 @@ export class NodeComputer implements ComputerPort {
     const picked = await this.pick(reason);
     if (!picked) return null;
     const { label } = await this.store.add(picked);
+    void this.log?.append({ tool: "GrantAdded", detail: label, ok: true }).catch(() => undefined);
     return { label };
   }
 
@@ -37,7 +54,8 @@ export class NodeComputer implements ComputerPort {
     const { absolute } = await this.inside(path);
     try {
       const info = await stat(absolute);
-      return { exists: true, isDirectory: info.isDirectory(), size: info.isDirectory() ? 0 : info.size };
+      const directory = info.isDirectory();
+      return { exists: true, isDirectory: directory, size: directory ? 0 : info.size, cloudOnly: !directory && this.cloudOnly(info.size, info.blocks) };
     } catch {
       return { exists: false, isDirectory: false, size: 0 };
     }
@@ -46,6 +64,8 @@ export class NodeComputer implements ComputerPort {
   async readBytes(path: string): Promise<Uint8Array> {
     const { absolute, rest } = await this.inside(path);
     if (isSensitive(rest)) throw new ToolError(PROTECTED);
+    const info = await stat(absolute);
+    if (info.isFile() && this.cloudOnly(info.size, info.blocks)) throw new ToolError(cloudOnlyMessage(path));
     return new Uint8Array(await readFile(absolute));
   }
 
@@ -75,7 +95,13 @@ export class NodeComputer implements ComputerPort {
       if (!offset || offset.startsWith("..") || isAbsolute(offset) || isSensitive(offset)) continue;
       const info = await stat(real).catch(() => null);
       if (!info) continue;
-      entries.push({ path: `${label}/${offset.split(sep).join("/")}`, isDirectory: info.isDirectory(), size: info.isDirectory() ? 0 : info.size });
+      const directory = info.isDirectory();
+      entries.push({
+        path: `${label}/${offset.split(sep).join("/")}`,
+        isDirectory: directory,
+        size: directory ? 0 : info.size,
+        cloudOnly: !directory && this.cloudOnly(info.size, info.blocks),
+      });
     }
     return entries;
   }
@@ -86,11 +112,16 @@ export class NodeComputer implements ComputerPort {
     const entries = await readdir(absolute, { withFileTypes: true });
     const shown = entries.filter((entry) => !entry.isSymbolicLink() && !isSensitive(entry.name));
     return Promise.all(
-      shown.map(async (entry) => ({
-        name: entry.name,
-        isDirectory: entry.isDirectory(),
-        size: entry.isDirectory() ? 0 : (await stat(join(absolute, entry.name)).catch(() => ({ size: 0 }))).size,
-      })),
+      shown.map(async (entry) => {
+        const directory = entry.isDirectory();
+        const info = directory ? null : await stat(join(absolute, entry.name)).catch(() => null);
+        return {
+          name: entry.name,
+          isDirectory: directory,
+          size: info?.size ?? 0,
+          cloudOnly: !!info && this.cloudOnly(info.size, info.blocks),
+        };
+      }),
     );
   }
 
@@ -114,8 +145,8 @@ export class NodeComputer implements ComputerPort {
         yield { path: child, isDirectory: true, size: 0 };
         yield* this.walk(child, enter, signal);
       } else if (entry.isFile()) {
-        const size = await lstat(join(absolute, entry.name)).then((s) => s.size, () => 0);
-        yield { path: child, isDirectory: false, size };
+        const info = await lstat(join(absolute, entry.name)).catch(() => null);
+        yield { path: child, isDirectory: false, size: info?.size ?? 0, cloudOnly: !!info && this.cloudOnly(info.size, info.blocks) };
       }
     }
   }

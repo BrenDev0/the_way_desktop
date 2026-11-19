@@ -4,7 +4,8 @@ import { join, parse } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { computerTools } from "../../src/core/tools/computer";
 import { ComputerGrants } from "../../src/main/computerGrants";
-import { NodeComputer } from "../../src/main/nodeComputer";
+import { ComputerLog } from "../../src/main/computerLog";
+import { NodeComputer, type NodeComputerOptions } from "../../src/main/nodeComputer";
 import type { SearchKind, SystemSearch } from "../../src/main/systemSearch";
 
 let base: string;
@@ -31,7 +32,7 @@ afterEach(async () => {
   await rm(base, { recursive: true, force: true });
 });
 
-async function computer(picks: (string | null)[] = [], system: SystemSearch | null = null) {
+async function computer(picks: (string | null)[] = [], options: NodeComputerOptions = {}) {
   const grants = new ComputerGrants(data);
   await grants.claim("ana");
   const queue = [...picks];
@@ -44,7 +45,7 @@ async function computer(picks: (string | null)[] = [], system: SystemSearch | nu
       extracted.push({ name, text });
       return `extraído: ${text}`;
     },
-    system,
+    options,
   );
   return { grants, access, extracted, tools: computerTools(access) };
 }
@@ -188,14 +189,14 @@ describe("NodeComputer with the system index", () => {
 
   it("turns what the index found into granted paths, with what each one is", async () => {
     const { system, asked } = answering([join(docs, "contratos", "acme.txt"), join(docs, "contratos")]);
-    const { access } = await computer([docs], system);
+    const { access } = await computer([docs], { system });
     await access.choose("buscar");
 
     const found = await access.indexed("Documentos", ["acme"], "name");
 
     expect(found).toEqual([
-      { path: "Documentos/contratos/acme.txt", isDirectory: false, size: 16 },
-      { path: "Documentos/contratos", isDirectory: true, size: 0 },
+      { path: "Documentos/contratos/acme.txt", isDirectory: false, size: 16, cloudOnly: false },
+      { path: "Documentos/contratos", isDirectory: true, size: 0, cloudOnly: false },
     ]);
     expect(asked).toHaveLength(1);
     expect(asked[0].terms).toEqual(["acme"]);
@@ -204,7 +205,7 @@ describe("NodeComputer with the system index", () => {
 
   it("asks the index about the folder searched, not the whole grant", async () => {
     const { system, asked } = answering([]);
-    const { access } = await computer([docs], system);
+    const { access } = await computer([docs], { system });
     await access.choose("buscar");
 
     await access.indexed("Documentos/contratos", ["acme"], "content");
@@ -222,7 +223,7 @@ describe("NodeComputer with the system index", () => {
       docs,
       join(docs, "contratos", "acme.txt"),
     ]);
-    const { access } = await computer([docs], system);
+    const { access } = await computer([docs], { system });
     await access.choose("buscar");
 
     const found = await access.indexed("Documentos", ["x"], "name");
@@ -232,7 +233,7 @@ describe("NodeComputer with the system index", () => {
 
   it("drops a link that leads out of the grant", async (context) => {
     const { system } = answering([join(docs, "escape", "secret.txt")]);
-    const { access } = await computer([docs], system);
+    const { access } = await computer([docs], { system });
     await access.choose("buscar");
     try {
       await symlink(outside, join(docs, "escape"), "junction");
@@ -244,9 +245,9 @@ describe("NodeComputer with the system index", () => {
   });
 
   it("answers null when there is no index, or it could not answer, so the caller walks instead", async () => {
-    const none = await computer([docs], null);
+    const none = await computer([docs]);
     await none.access.choose("buscar");
-    const broken = await computer([docs], answering(null).system);
+    const broken = await computer([docs], { system: answering(null).system });
     await broken.access.choose("buscar");
 
     expect(await none.access.indexed("Documentos", ["a"], "name")).toBeNull();
@@ -255,7 +256,7 @@ describe("NodeComputer with the system index", () => {
 
   it("refuses a folder that was not granted, and never asks the index about it", async () => {
     const { system, asked } = answering([]);
-    const { access } = await computer([docs], system);
+    const { access } = await computer([docs], { system });
     await access.choose("buscar");
 
     await expect(access.indexed("Otra", ["a"], "name")).rejects.toThrow(/not a folder the user has granted/);
@@ -264,10 +265,90 @@ describe("NodeComputer with the system index", () => {
 
   it("does not ask the index about a protected folder", async () => {
     const { system, asked } = answering([]);
-    const { access } = await computer([docs], system);
+    const { access } = await computer([docs], { system });
     await access.choose("buscar");
 
     expect(await access.indexed("Documentos/.ssh", ["a"], "name")).toEqual([]);
     expect(asked).toEqual([]);
+  });
+});
+
+describe("NodeComputer and files kept only in the cloud", () => {
+  const CLOUD_SIZE = 5000;
+  const flagged = { cloudOnly: (size: number) => size === CLOUD_SIZE };
+
+  beforeEach(async () => {
+    await writeFile(join(docs, "nube.txt"), "n".repeat(CLOUD_SIZE));
+    await writeFile(join(docs, "local.txt"), "hola");
+  });
+
+  it("flags them when asked about them, and when listing and walking", async () => {
+    const { access } = await computer([docs], flagged);
+    await access.choose("buscar");
+
+    expect((await access.stat("Documentos/nube.txt")).cloudOnly).toBe(true);
+    expect((await access.stat("Documentos/local.txt")).cloudOnly).toBe(false);
+    const listed = await access.list("Documentos");
+    expect(listed.find((entry) => entry.name === "nube.txt")?.cloudOnly).toBe(true);
+    expect(listed.find((entry) => entry.name === "local.txt")?.cloudOnly).toBe(false);
+    const walked: Record<string, boolean | undefined> = {};
+    for await (const entry of access.walk("Documentos", () => true)) walked[entry.path] = entry.cloudOnly;
+    expect(walked["Documentos/nube.txt"]).toBe(true);
+    expect(walked["Documentos/local.txt"]).toBe(false);
+  });
+
+  it("refuses to open them, so nothing is downloaded", async () => {
+    const { access, tools } = await computer([docs], flagged);
+    await access.choose("buscar");
+
+    await expect(access.readBytes("Documentos/nube.txt")).rejects.toThrow(/only in the cloud/);
+    await expect(tools.ReadComputerFile.run({ path: "Documentos/nube.txt" })).rejects.toThrow(/only in the cloud/);
+    await expect(access.document("Documentos/nube.txt")).rejects.toThrow(/only in the cloud/);
+    expect(await tools.ReadComputerFile.run({ path: "Documentos/local.txt" })).toBe("hola");
+  });
+
+  it("flags what the index returns", async () => {
+    const system: SystemSearch = { search: async () => [join(docs, "nube.txt"), join(docs, "local.txt")] };
+    const { access } = await computer([docs], { ...flagged, system });
+    await access.choose("buscar");
+
+    const found = await access.indexed("Documentos", ["txt"], "name");
+
+    expect(found?.map((entry) => [entry.path, entry.cloudOnly])).toEqual([
+      ["Documentos/nube.txt", true],
+      ["Documentos/local.txt", false],
+    ]);
+  });
+
+  it("does not mistake an ordinary file on this disk for one", async () => {
+    await writeFile(join(docs, "grande.txt"), "g".repeat(200_000));
+    const { access } = await computer([docs]);
+    await access.choose("buscar");
+
+    expect((await access.stat("Documentos/grande.txt")).cloudOnly).toBe(false);
+    expect((await access.stat("Documentos/local.txt")).cloudOnly).toBe(false);
+  });
+});
+
+describe("NodeComputer and the record", () => {
+  it("notes a folder being opened to the agent", async () => {
+    const log = new ComputerLog(data);
+    await log.claim("ana");
+    const { access } = await computer([docs], { log });
+
+    await access.choose("buscar");
+    await log.recent();
+
+    expect((await log.recent()).map((entry) => [entry.tool, entry.detail, entry.ok])).toEqual([["GrantAdded", "Documentos", true]]);
+  });
+
+  it("notes nothing when the user picks no folder", async () => {
+    const log = new ComputerLog(data);
+    await log.claim("ana");
+    const { access } = await computer([null], { log });
+
+    await access.choose("buscar");
+
+    expect(await log.recent()).toEqual([]);
   });
 });

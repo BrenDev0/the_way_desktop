@@ -18,6 +18,7 @@ import { microphoneAccess } from "./micAccess";
 import { NodeUpdater } from "./nodeUpdater";
 import { operatorMessage } from "../core/workspace/messages";
 import type { ComputerGrants } from "./computerGrants";
+import type { ComputerLog } from "./computerLog";
 import type { NodeComputer } from "./nodeComputer";
 import type { NodeFileSystem } from "./nodeFileSystem";
 import type { ProjectsApi } from "./projectsApi";
@@ -40,6 +41,7 @@ export interface AppServices {
   /** Read-only folders the user has granted beyond the open one. */
   computer: NodeComputer;
   computerGrants: ComputerGrants;
+  computerLog: ComputerLog;
   localFiles: LocalFiles;
   projects: ProjectsApi;
   voice: VoiceApi;
@@ -138,7 +140,10 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     if (state.user && (await services.workspace.claim(state.user.id))) {
       await mainWindow()?.webContents.session.clearCache();
     }
-    if (state.user) await services.computerGrants.claim(state.user.id);
+    if (state.user) {
+      await services.computerGrants.claim(state.user.id);
+      await services.computerLog.claim(state.user.id);
+    }
     return state;
   };
 
@@ -162,7 +167,18 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     await services.computer.choose("");
     return services.computerGrants.list();
   });
-  handle(CHANNELS.computerGrantRemove, (id) => services.computerGrants.remove(requireText(id, "grant")));
+  handle(CHANNELS.computerGrantRemove, async (id) => {
+    const grantId = requireText(id, "grant");
+    const removed = (await services.computerGrants.list()).find((grant) => grant.id === grantId);
+    const rest = await services.computerGrants.remove(grantId);
+    if (removed) await services.computerLog.append({ tool: "GrantRemoved", detail: removed.label, ok: true }).catch(() => undefined);
+    return rest;
+  });
+  handle(CHANNELS.computerLog, () => services.computerLog.recent(100));
+  handle(CHANNELS.computerLogClear, async () => {
+    await services.computerLog.clear();
+    return [];
+  });
 
   handle(CHANNELS.workspaceCurrent, () => services.workspace.current());
   handle(CHANNELS.workspacePlace, () => services.workspace.place());

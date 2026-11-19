@@ -60,7 +60,10 @@ class FakeComputer implements ComputerPort {
     return [...names.values()];
   }
 
+  reads: string[] = [];
+
   async readBytes(path: string) {
+    this.reads.push(path);
     return new TextEncoder().encode(this.files[path]);
   }
 
@@ -259,52 +262,84 @@ describe("ReadComputerFile on documents and long files", () => {
 
 const file = (path: string, size = 10): WalkEntry => ({ path, isDirectory: false, size });
 
-describe("SearchComputer with the system index", () => {
-  const files = { "Documentos/acme-notas.txt": "x", "Documentos/otro/acme.txt": "x" };
+const filler = (count: number, content = "x") =>
+  Object.fromEntries(Array.from({ length: count }, (_, i) => [`Documentos/relleno/f${String(i).padStart(4, "0")}.txt`, content]));
 
-  it("uses the index first and says it may be incomplete", async () => {
-    const computer = new FakeComputer(files);
+describe("SearchComputer and the system index", () => {
+  const small = { "Documentos/acme-notas.txt": "x", "Documentos/otro/acme.txt": "x" };
+  const big = () => ({ ...filler(5200), "Documentos/acme-notas.txt": "x", "Documentos/zzz-acme.txt": "x" });
+  const lines = (result: string) => result.split("\n").filter((line) => line.startsWith("Documentos/"));
+
+  it("scans a small folder itself, so nothing is missed, and does not ask the index", async () => {
+    const computer = new FakeComputer(small);
     computer.index.name = [file("Documentos/acme-notas.txt")];
 
     const result = await tools(computer).SearchComputer.run({ query: "Acme" });
 
-    expect(result).toContain("Documentos/acme-notas.txt");
-    expect(result).not.toContain("otro/acme.txt");
+    expect(lines(result)).toEqual(["Documentos/otro/acme.txt", "Documentos/acme-notas.txt"]);
+    expect(result).not.toMatch(/system index/);
+    expect(computer.indexCalls).toEqual([]);
+  });
+
+  it("still scans a folder of exactly the small size, without the index", async () => {
+    const computer = new FakeComputer({ ...filler(4999), "Documentos/acme.txt": "x" });
+    computer.index.name = [];
+
+    expect(await tools(computer).SearchComputer.run({ query: "acme" })).toBe("Documentos/acme.txt");
+    expect(computer.indexCalls).toEqual([]);
+  });
+
+  it("asks the index once the folder is bigger, and adds what it knows to what the scan found", async () => {
+    const computer = new FakeComputer(big());
+    computer.index.name = [file("Documentos/zzz-acme.txt")];
+
+    const result = await tools(computer).SearchComputer.run({ query: "acme" });
+
+    expect(lines(result)).toEqual(["Documentos/zzz-acme.txt", "Documentos/acme-notas.txt"]);
     expect(result).toMatch(/system index.*thorough=true/);
     expect(computer.indexCalls).toEqual(["name:Documentos:acme"]);
   });
 
-  it("walks every folder when the index finds nothing", async () => {
-    const computer = new FakeComputer(files);
+  it("does not list a file twice when the scan and the index both found it", async () => {
+    const computer = new FakeComputer(big());
+    computer.index.name = [file("Documentos/acme-notas.txt"), file("Documentos/zzz-acme.txt")];
+
+    expect(lines(await tools(computer).SearchComputer.run({ query: "acme" }))).toEqual(["Documentos/zzz-acme.txt", "Documentos/acme-notas.txt"]);
+  });
+
+  it("keeps scanning to the end when the index finds nothing", async () => {
+    const computer = new FakeComputer(big());
     computer.index.name = [];
 
     const result = await tools(computer).SearchComputer.run({ query: "acme" });
 
-    expect(result.split("\n")).toEqual(["Documentos/otro/acme.txt", "Documentos/acme-notas.txt"]);
-  });
-
-  it("walks every folder when there is no index to ask", async () => {
-    const result = await tools(new FakeComputer(files)).SearchComputer.run({ query: "acme" });
-
-    expect(result).toContain("Documentos/otro/acme.txt");
+    expect(result).toContain("Documentos/zzz-acme.txt");
     expect(result).not.toMatch(/system index/);
+    expect(computer.indexCalls).toHaveLength(1);
   });
 
-  it("walks every folder when asked to be thorough, without asking the index", async () => {
-    const computer = new FakeComputer(files);
+  it("keeps scanning to the end when there is no index to ask", async () => {
+    expect(await tools(new FakeComputer(big())).SearchComputer.run({ query: "acme" })).toContain("Documentos/zzz-acme.txt");
+  });
+
+  it("scans to the end and never asks the index when told to be thorough", async () => {
+    const computer = new FakeComputer(big());
     computer.index.name = [file("Documentos/acme-notas.txt")];
 
     const result = await tools(computer).SearchComputer.run({ query: "acme", thorough: true });
 
-    expect(result).toContain("Documentos/otro/acme.txt");
+    expect(result).toContain("Documentos/zzz-acme.txt");
     expect(computer.indexCalls).toEqual([]);
   });
 
   it("drops what the index returns from build folders", async () => {
-    const computer = new FakeComputer(files);
-    computer.index.name = [file("Documentos/node_modules/acme.txt"), file("Documentos/acme-notas.txt")];
+    const computer = new FakeComputer(big());
+    computer.index.name = [file("Documentos/node_modules/acme.txt"), file("Documentos/zzz-acme.txt")];
 
-    expect(await tools(computer).SearchComputer.run({ query: "acme" })).not.toContain("node_modules");
+    const result = await tools(computer).SearchComputer.run({ query: "acme" });
+
+    expect(result).not.toContain("node_modules");
+    expect(result).toContain("Documentos/zzz-acme.txt");
   });
 
   it("matches without caring about accents or capitals", async () => {
@@ -392,6 +427,53 @@ describe("SearchComputerText", () => {
     stopped.abort();
 
     await expect(tools(new FakeComputer(files)).SearchComputerText.run({ query: "acme" }, stopped.signal)).rejects.toThrow();
+  });
+});
+
+describe("SearchComputerText and folder size", () => {
+  const big = () => ({ ...filler(5200, "nada"), "Documentos/notas.txt": "contrato acme", "Documentos/zzz-tarde.txt": "contrato acme" });
+
+  it("stops scanning a big folder when the index knows it, keeping what the scan found first", async () => {
+    const computer = new FakeComputer(big());
+    computer.index.content = [file("Documentos/informe.pdf")];
+
+    const result = await tools(computer).SearchComputerText.run({ query: "acme" });
+
+    expect(result).toContain("Documentos/notas.txt:1: contrato acme");
+    expect(result).toContain("Documentos/informe.pdf  (document)");
+    expect(result).not.toContain("zzz-tarde");
+    expect(computer.reads.length).toBeLessThan(5200);
+  });
+
+  it("scans a big folder to the end when the index knows nothing", async () => {
+    const computer = new FakeComputer(big());
+    computer.index.content = [];
+
+    expect(await tools(computer).SearchComputerText.run({ query: "acme" })).toContain("Documentos/zzz-tarde.txt:1");
+    expect(computer.reads).toHaveLength(5202);
+  });
+
+  it("scans a big folder to the end when told to be thorough, though the index knows it", async () => {
+    const computer = new FakeComputer(big());
+    computer.index.content = [file("Documentos/informe.pdf")];
+
+    const result = await tools(computer).SearchComputerText.run({ query: "acme", thorough: true });
+
+    expect(result).toContain("Documentos/zzz-tarde.txt:1");
+    expect(result).not.toContain("informe.pdf");
+    expect(computer.indexCalls).toEqual([]);
+  });
+
+  it("reads every text file of a small folder itself, and still adds the documents only the index knows", async () => {
+    const computer = new FakeComputer({ "Documentos/notas.txt": "contrato acme", "Documentos/otro.txt": "contrato acme tambien" });
+    computer.index.content = [file("Documentos/notas.txt"), file("Documentos/informe.pdf")];
+
+    const result = await tools(computer).SearchComputerText.run({ query: "acme" });
+
+    expect(result).toContain("Documentos/notas.txt:1: contrato acme");
+    expect(result).toContain("Documentos/otro.txt:1: contrato acme tambien");
+    expect(result).toContain("Documentos/informe.pdf  (document)");
+    expect(result.match(/notas\.txt/g)).toHaveLength(1);
   });
 });
 

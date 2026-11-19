@@ -20,6 +20,7 @@ import { BACKGROUND, setUpAppearance } from "./appearance";
 import { ConversationEvents } from "./conversationEvents";
 import { DockWindow } from "./dockWindow";
 import { ComputerGrants } from "./computerGrants";
+import { ComputerLog } from "./computerLog";
 import { DocumentApi } from "./documentApi";
 import { ElectronBrowser } from "./electronBrowser";
 import { NodeComputer } from "./nodeComputer";
@@ -193,6 +194,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
   // One fenced file system and one projects client, shared by the agent's tools and the files panel.
   const fileSystem = new NodeFileSystem(() => workspace.current());
   const computerGrants = new ComputerGrants(userData);
+  const computerLog = new ComputerLog(userData);
   const documents = new DocumentApi(api);
   const computer = new NodeComputer(computerGrants, async (reason) => {
     const options = {
@@ -203,7 +205,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     };
     const picked = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
     return picked.canceled ? null : picked.filePaths[0] ?? null;
-  }, (name, data) => documents.text(name, data), systemSearchFor(process.platform));
+  }, (name, data) => documents.text(name, data), { system: systemSearchFor(process.platform), log: computerLog });
   const projects = new ProjectsApi(api);
 
   const runner = new ToolRunner(
@@ -214,6 +216,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
       git: new NodeGit(() => workspace.current()),
       command: new NodeCommand(() => workspace.current()),
       computer,
+      audit: (entry) => void computerLog.append(entry).catch(() => undefined),
     }),
     // one image approval covers the rest of a reply's images; background tasks keep the
     // same allowance on the server
@@ -296,6 +299,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     fileSystem,
     computer,
     computerGrants,
+    computerLog,
     localFiles: new LocalFiles(fileSystem),
     projects,
     voice: new VoiceApi(api),
