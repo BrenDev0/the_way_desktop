@@ -35,7 +35,7 @@ export interface FileSystemPort {
   writeBytes(path: string, data: Uint8Array): Promise<void>;
   list(path: string): Promise<DirectoryEntry[]>;
   /** Everything below a folder, skipping folders the callback rejects (and all under them). */
-  walk(path: string, enter: (name: string) => boolean): AsyncIterable<WalkEntry>;
+  walk(path: string, enter: (name: string) => boolean, signal?: AbortSignal): AsyncIterable<WalkEntry>;
   makeDirectory(path: string): Promise<void>;
   /** Recursive for folders. The target must not exist. */
   copy(source: string, target: string): Promise<void>;

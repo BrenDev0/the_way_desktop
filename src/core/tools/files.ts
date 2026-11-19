@@ -70,7 +70,7 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     return lines.join("\n") || "(empty directory)";
   }
 
-  async function searchFile(args: ToolArgs): Promise<string> {
+  async function searchFile(args: ToolArgs, signal?: AbortSignal): Promise<string> {
     const query = text(args, "file_name");
     const base = fs.normalize(optionalText(args, "base_dir", "."));
     const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -82,7 +82,8 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     // tasks/progreso-q3/report.md -- the words can live in different segments.
     const hits: { nameHits: number; path: string; isDirectory: boolean }[] = [];
     let scanned = 0;
-    for await (const entry of fs.walk(base, (name) => !IGNORED_DIRS.has(name))) {
+    for await (const entry of fs.walk(base, (name) => !IGNORED_DIRS.has(name), signal)) {
+      signal?.throwIfAborted();
       scanned += 1;
       const haystack = entry.path.toLowerCase();
       if (!terms.every((term) => haystack.includes(term))) continue;
@@ -107,7 +108,7 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     return lines.join("\n");
   }
 
-  async function searchCode(args: ToolArgs): Promise<string> {
+  async function searchCode(args: ToolArgs, signal?: AbortSignal): Promise<string> {
     const pattern = text(args, "pattern");
     const base = fs.normalize(optionalText(args, "base_dir", "."));
     const glob = args.file_glob == null ? null : text(args, "file_glob");
@@ -129,7 +130,8 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     if (root.exists && !root.isDirectory) {
       candidates.push({ path: base, size: root.size });
     } else {
-      for await (const entry of fs.walk(base, (name) => !IGNORED_DIRS.has(name))) {
+      for await (const entry of fs.walk(base, (name) => !IGNORED_DIRS.has(name), signal)) {
+        signal?.throwIfAborted();
         if (!entry.isDirectory) candidates.push(entry);
       }
     }
@@ -144,6 +146,7 @@ export function fileTools(fs: FileSystemPort): ToolRegistry {
     let unreadable = 0;
 
     for (const file of candidates) {
+      signal?.throwIfAborted();
       if (globMatcher && !globMatcher.test(file.path.split("/").pop()!)) continue;
       if (file.size > MAX_SEARCH_BYTES) continue;
 

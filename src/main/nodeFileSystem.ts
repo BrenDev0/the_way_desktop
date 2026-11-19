@@ -67,7 +67,8 @@ export class NodeFileSystem implements FileSystemPort {
     );
   }
 
-  async *walk(path: string, enter: (name: string) => boolean): AsyncIterable<WalkEntry> {
+  async *walk(path: string, enter: (name: string) => boolean, signal?: AbortSignal): AsyncIterable<WalkEntry> {
+    signal?.throwIfAborted();
     const base = this.normalize(path);
     const absolute = await this.inside(base);
     let entries;
@@ -77,13 +78,14 @@ export class NodeFileSystem implements FileSystemPort {
       return; // unreadable folders are skipped, not fatal to a whole search
     }
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      signal?.throwIfAborted();
       // Links are not followed: a link to somewhere else is how a walk leaves the folder.
       if (entry.isSymbolicLink()) continue;
       const child = base ? `${base}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
         if (!enter(entry.name)) continue;
         yield { path: child, isDirectory: true, size: 0 };
-        yield* this.walk(child, enter);
+        yield* this.walk(child, enter, signal);
       } else if (entry.isFile()) {
         const size = await lstat(join(absolute, entry.name)).then((s) => s.size, () => 0);
         yield { path: child, isDirectory: false, size };

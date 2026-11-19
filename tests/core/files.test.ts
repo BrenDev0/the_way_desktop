@@ -7,6 +7,32 @@ function tools(seed: Record<string, string | Uint8Array> = {}) {
   return { fs, run: (name: string, args: Record<string, unknown>) => fileTools(fs)[name].run(args) };
 }
 
+describe("a search the user stopped", () => {
+  const seed = { "a/informe.txt": "x", "b/informe-final.txt": "x" };
+
+  it("ends SearchFile instead of finishing the walk", async () => {
+    const { fs } = tools(seed);
+    const stopped = new AbortController();
+    stopped.abort();
+
+    await expect(fileTools(fs).SearchFile.run({ file_name: "informe" }, stopped.signal)).rejects.toThrow();
+  });
+
+  it("ends SearchCode instead of finishing the walk", async () => {
+    const { fs } = tools(seed);
+    const stopped = new AbortController();
+    stopped.abort();
+
+    await expect(fileTools(fs).SearchCode.run({ pattern: "x" }, stopped.signal)).rejects.toThrow();
+  });
+
+  it("still finishes when nobody stopped it", async () => {
+    const { fs } = tools(seed);
+
+    expect(await fileTools(fs).SearchFile.run({ file_name: "informe" }, new AbortController().signal)).toContain("a/informe.txt");
+  });
+});
+
 describe("ReadFile", () => {
   it("returns the text with every line ending turned into \\n", async () => {
     const { run } = tools({ "notes.md": "one\r\ntwo\r\r\nthree\rfour" });

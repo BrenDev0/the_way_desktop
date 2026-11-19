@@ -4,12 +4,14 @@ import {
   type BackgroundTask,
   type Conversation,
   type ConversationEventsPort,
+  type PendingToolCall,
   type ServerApiPort,
 } from "../../src/core/api";
 import { pauseText } from "../../src/core/conversations/pause";
 import { TurnService } from "../../src/core/conversations/turnService";
 import type { SseEvent } from "../../src/core/sse";
 import { TaskMonitor, type TaskView } from "../../src/core/tasks/taskMonitor";
+import type { ToolRegistry } from "../../src/core/tools/contract";
 import { ToolRunner } from "../../src/core/tools/runner";
 
 function conversation(status: Conversation["status"], overrides: Partial<Conversation> = {}): Conversation {
@@ -26,7 +28,7 @@ const stoppedTurn = conversation("paused", {
 /** Answers each request from a table keyed "METHOD path", and remembers what was asked. */
 class Api implements ServerApiPort {
   readonly asked: string[] = [];
-  constructor(private readonly answers: Record<string, unknown | Error>) {}
+  constructor(readonly answers: Record<string, unknown | Error>) {}
   async request<T>(method: string, path: string): Promise<T> {
     this.asked.push(`${method} ${path}`);
     const answer = this.answers[`${method} ${path}`];
@@ -83,6 +85,78 @@ describe("stopping a turn", () => {
 
   it("has no questions on screen for a conversation nothing is settling", () => {
     expect(turns(new Api({})).service.settling("conv")).toEqual([]);
+  });
+});
+
+describe("stopping while a tool runs on this computer", () => {
+  const search: PendingToolCall = {
+    id: "c1", name: "SearchFile", args: { file_name: "informe" }, location: "desktop", requiresApproval: false, detail: null,
+  };
+
+  class AwaitingThenStopped implements ConversationEventsPort {
+    private opened = 0;
+    async *open(): AsyncIterable<SseEvent> {
+      this.opened += 1;
+      const next = this.opened === 1 ? conversation("awaiting_client", { pendingToolCalls: [search] }) : stoppedTurn;
+      yield { id: `${this.opened}-0`, type: "status", data: JSON.stringify(next) };
+    }
+  }
+
+  it("does not wait for the tool: the turn ends, the tool is told to end, and nothing is posted", async () => {
+    let signal: AbortSignal | undefined;
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => (started = resolve));
+    const registry: ToolRegistry = {
+      SearchFile: {
+        run: (_args, given) => {
+          signal = given;
+          started();
+          return new Promise<string>(() => {});
+        },
+      },
+    };
+    const api = new Api({ "POST /conversations/conv/stop": stoppedTurn });
+    const service = new TurnService(api, new AwaitingThenStopped(), new ToolRunner(registry, { request: async () => ({ approved: true }) }), {
+      update: () => {},
+    });
+
+    const driven = service.drive("conv");
+    await running;
+    await service.stop("conv");
+    const finished = await driven;
+
+    expect(finished.status).toBe("paused");
+    expect(signal?.aborted).toBe(true);
+    expect(api.asked).toEqual(["POST /conversations/conv/stop"]);
+  });
+
+  it("leaves a tool alone when the server refuses the stop", async () => {
+    let signal: AbortSignal | undefined;
+    let started!: () => void;
+    let finish!: (output: string) => void;
+    const running = new Promise<void>((resolve) => (started = resolve));
+    const registry: ToolRegistry = {
+      SearchFile: {
+        run: (_args, given) => {
+          signal = given;
+          started();
+          return new Promise<string>((resolve) => (finish = resolve));
+        },
+      },
+    };
+    const api = new Api({ "POST /conversations/conv/stop": new ApiError(500, "internal_server_error", "boom") });
+    const service = new TurnService(api, new AwaitingThenStopped(), new ToolRunner(registry, { request: async () => ({ approved: true }) }), {
+      update: () => {},
+    });
+
+    const driven = service.drive("conv");
+    await running;
+    await expect(service.stop("conv")).rejects.toThrow("boom");
+
+    expect(signal?.aborted).toBe(false);
+    finish("found");
+    api.answers["POST /conversations/conv/tool-results"] = stoppedTurn;
+    await driven;
   });
 });
 

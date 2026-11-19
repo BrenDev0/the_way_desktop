@@ -26,6 +26,8 @@ export interface ApprovalPort {
   request(request: ApprovalRequest): Promise<ApprovalDecision>;
 }
 
+const STOPPED = "The user stopped the work, so this was not finished.";
+
 export const UNKNOWN_TOOL =
   "This version of the desktop app does not know the tool '{name}', so it was not run. " +
   "Tell the user their desktop app may need updating, and carry on without it.";
@@ -53,13 +55,15 @@ export class ToolRunner {
     return serverTools.filter((name) => !this.implements(name));
   }
 
-  async resolveAll(calls: readonly PendingToolCall[], run?: string): Promise<ToolResolution[]> {
+  async resolveAll(calls: readonly PendingToolCall[], run?: string, signal?: AbortSignal): Promise<ToolResolution[]> {
     const resolutions: ToolResolution[] = [];
-    for (const call of calls) resolutions.push(await this.resolve(call, run));
+    for (const call of calls) resolutions.push(await this.resolve(call, run, signal));
     return resolutions;
   }
 
-  async resolve(call: PendingToolCall, run?: string): Promise<ToolResolution> {
+  async resolve(call: PendingToolCall, run?: string, signal?: AbortSignal): Promise<ToolResolution> {
+    if (signal?.aborted) return { toolCallId: call.id, approved: false, feedback: STOPPED };
+
     const handler = this.tools[call.name];
 
     if (call.location === "server") {
@@ -83,8 +87,9 @@ export class ToolRunner {
     }
 
     try {
-      return { toolCallId: call.id, approved: true, output: await handler.run(call.args) };
+      return { toolCallId: call.id, approved: true, output: await handler.run(call.args, signal) };
     } catch (error) {
+      if (signal?.aborted) return { toolCallId: call.id, approved: true, output: STOPPED, failed: true };
       return { toolCallId: call.id, approved: true, output: describe(error), failed: true };
     }
   }

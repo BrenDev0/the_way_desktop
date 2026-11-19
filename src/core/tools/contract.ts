@@ -76,7 +76,7 @@ export class ToolError extends Error {
 }
 
 export interface ToolHandler {
-  run(args: ToolArgs): Promise<string>;
+  run(args: ToolArgs, signal?: AbortSignal): Promise<string>;
   /** What the approval dialog shows beyond the arguments: a diff, a full message. */
   preview?(args: ToolArgs): Promise<string | undefined>;
 }

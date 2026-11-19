@@ -162,6 +162,7 @@ export class TurnService {
     try {
       const stopped = await this.api.request<Conversation>("POST", `/conversations/${conversationId}/stop`);
       this.events.update(stopped);
+      this.running.get(conversationId)?.abort();
       return stopped;
     } catch (error) {
       // it ended by itself an instant before: there is nothing left to stop
@@ -310,13 +311,25 @@ export class TurnService {
     // a turn picked up after a restart is a run of its own
     const run = this.runs.get(conversationId) ?? `${conversationId}:${++this.sent}`;
     this.runs.set(conversationId, run);
+    const stopped = new AbortController();
+    this.running.set(conversationId, stopped);
+    let resolved: ToolResolution[] | undefined;
     try {
-      for (const resolution of await this.runner.resolveAll(unsettled, run)) {
-        this.settled.set(resolution.toolCallId, resolution);
-      }
+      const work = this.runner.resolveAll(unsettled, run, stopped.signal);
+      work.catch(() => undefined);
+      resolved = await Promise.race([
+        work,
+        new Promise<undefined>((resolve) => stopped.signal.addEventListener("abort", () => resolve(undefined), { once: true })),
+      ]);
     } finally {
       this.settlingCalls.delete(conversationId);
+      this.running.delete(conversationId);
     }
+    if (!resolved) {
+      for (const call of paused.pendingToolCalls) answered.add(call.id);
+      return;
+    }
+    for (const resolution of resolved) this.settled.set(resolution.toolCallId, resolution);
     const resolutions = paused.pendingToolCalls.map((call) => this.settled.get(call.id)!);
 
     try {
@@ -339,6 +352,7 @@ export class TurnService {
 
   private readonly settled = new Map<string, ToolResolution>();
   private readonly settlingCalls = new Map<string, string[]>();
+  private readonly running = new Map<string, AbortController>();
   /** Conversations whose current turn was spoken. */
   private readonly voice = new Set<string>();
   /** The run each conversation is on: one per message sent. */
