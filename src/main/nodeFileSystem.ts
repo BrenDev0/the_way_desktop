@@ -4,8 +4,9 @@ import { ToolError } from "../core/tools/contract";
 import type { DirectoryEntry, FileInfo, FileSystemPort, WalkEntry } from "../core/tools/ports";
 
 const NO_FOLDER =
-  "No folder is open in the desktop app, so there is nothing to work in. Ask the user to " +
-  "choose one with the folder button, then try again.";
+  "No folder is open in the desktop app, so there is nothing to work in. To create or change files, " +
+  "ask the user to choose one with the folder button, then try again. To only FIND or read files " +
+  "elsewhere on their computer no folder is needed: call RequestComputerAccess, then SearchComputer.";
 
 /**
  * The real disk, fenced to the folder the user opened. The fence is here, once, rather
