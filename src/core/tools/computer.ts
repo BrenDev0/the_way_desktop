@@ -1,15 +1,40 @@
-import { optionalText, text, ToolError, type ToolArgs, type ToolRegistry } from "./contract";
+import { foldText, hasAllTerms, rawTermsOf, snippetOf, termsOf, TEXT_FILE } from "../computer/search";
+import { flag, optionalText, text, ToolError, type ToolArgs, type ToolRegistry } from "./contract";
 import { IGNORED_DIRS } from "./files";
-import type { ComputerPort } from "./ports";
+import type { ComputerPort, WalkEntry } from "./ports";
 import { decodeText } from "./text";
 
 const SEARCH_LIMIT = 50;
+const TEXT_SEARCH_LIMIT = 30;
 const MAX_SCANNED = 300_000;
+const MAX_SCAN_BYTES = 300 * 1024 * 1024;
 const MAX_READ_BYTES = 2_000_000;
+const MAX_DOCUMENT_BYTES = 32 * 1024 * 1024;
+const PAGE_CHARS = 40_000;
+const CACHED_DOCUMENTS = 3;
+const DOCUMENT = /\.(pdf|docx|xlsx)$/i;
+const INDEX_NOTE = "From the system index, which can miss files it has not indexed yet; set thorough=true to scan every folder.";
 
 const bytes = (n: number) => n.toLocaleString("en-US");
+const ignored = (path: string) => path.split("/").some((part) => IGNORED_DIRS.has(part));
+
+function pageOf(text: string, offset: number): string {
+  if (offset > 0 && offset >= text.length) throw new ToolError(`offset ${offset} is past the end: the file has ${bytes(text.length)} characters`);
+  const end = Math.min(text.length, offset + PAGE_CHARS);
+  if (offset === 0 && end === text.length) return text;
+  const more = end < text.length ? `; call again with offset=${end} for the rest` : "; end of file";
+  return `${text.slice(offset, end)}\n\n[characters ${bytes(offset)}-${bytes(end)} of ${bytes(text.length)}${more}]`;
+}
 
 export function computerTools(computer: ComputerPort): ToolRegistry {
+  const documents = new Map<string, string>();
+
+  async function targetsOf(args: ToolArgs): Promise<{ wanted: string; targets: string[] }> {
+    const wanted = optionalText(args, "path", "").trim();
+    const targets = wanted ? [wanted] : (await computer.grants()).map((grant) => grant.label);
+    return { wanted, targets };
+  }
+
   async function requestAccess(args: ToolArgs): Promise<string> {
     const reason = text(args, "reason").trim().slice(0, 300);
     if (!reason) throw new ToolError("'reason' is required: say what you are looking for");
@@ -42,17 +67,30 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
 
   async function search(args: ToolArgs, signal?: AbortSignal): Promise<string> {
     const query = text(args, "query");
-    const terms = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    const terms = termsOf(query);
     if (terms.length === 0) return "Give something to search for -- a filename, a word from one, or a folder name.";
 
-    const wanted = optionalText(args, "path", "").trim();
-    const targets = wanted ? [wanted] : (await computer.grants()).map((grant) => grant.label);
+    const thorough = flag(args, "thorough");
+    const { wanted, targets } = await targetsOf(args);
     if (targets.length === 0) return "No folder has been granted yet. Ask the user with RequestComputerAccess.";
 
     const hits: { nameHits: number; path: string; isDirectory: boolean }[] = [];
+    const add = (path: string, isDirectory: boolean) => {
+      const name = foldText(path.split("/").pop()!);
+      hits.push({ nameHits: terms.filter((t) => name.includes(t)).length, path, isDirectory });
+    };
     let scanned = 0;
     let cut = false;
+    let viaIndex = false;
     for (const target of targets) {
+      if (!thorough) {
+        const found = await computer.indexed(target, rawTermsOf(query), "name", signal);
+        if (found?.length) {
+          viaIndex = true;
+          for (const entry of found) if (!ignored(entry.path)) add(entry.path, entry.isDirectory);
+          continue;
+        }
+      }
       for await (const entry of computer.walk(target, (name) => !IGNORED_DIRS.has(name), signal)) {
         signal?.throwIfAborted();
         scanned += 1;
@@ -60,23 +98,95 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
           cut = true;
           break;
         }
-        const haystack = entry.path.toLowerCase();
-        if (!terms.every((term) => haystack.includes(term))) continue;
-        const name = entry.path.split("/").pop()!.toLowerCase();
-        hits.push({ nameHits: terms.filter((t) => name.includes(t)).length, path: entry.path, isDirectory: entry.isDirectory });
+        if (hasAllTerms(entry.path, terms)) add(entry.path, entry.isDirectory);
       }
       if (cut) break;
     }
 
-    const note = cut ? ` Stopped after ${bytes(MAX_SCANNED)} entries; narrow it with 'path'.` : "";
+    const notes = [
+      cut ? `Stopped after ${bytes(MAX_SCANNED)} entries; narrow it with 'path'.` : "",
+      viaIndex ? INDEX_NOTE : "",
+    ].filter(Boolean);
     if (hits.length === 0) {
-      return `Nothing matches all of [${terms.join(", ")}] in ${wanted || "the granted folders"} (searched ${bytes(scanned)} entries).${note}`;
+      return [`Nothing matches all of [${terms.join(", ")}] in ${wanted || "the granted folders"} (searched ${bytes(scanned)} entries).`, ...notes].join(" ");
     }
     hits.sort((a, b) => b.nameHits - a.nameHits || a.path.length - b.path.length || a.path.localeCompare(b.path));
     const lines = hits.slice(0, SEARCH_LIMIT).map((h) => (h.isDirectory ? `${h.path}/` : h.path));
     if (hits.length > SEARCH_LIMIT) lines.push(`... and ${hits.length - SEARCH_LIMIT} more; narrow the query or set 'path'`);
-    if (note) lines.push(note.trim());
-    return lines.join("\n");
+    return [...lines, ...notes].join("\n");
+  }
+
+  async function searchText(args: ToolArgs, signal?: AbortSignal): Promise<string> {
+    const query = text(args, "query");
+    const terms = termsOf(query);
+    if (terms.length === 0) return "Give some words to look for inside the files.";
+
+    const thorough = flag(args, "thorough");
+    const { wanted, targets } = await targetsOf(args);
+    if (targets.length === 0) return "No folder has been granted yet. Ask the user with RequestComputerAccess.";
+
+    const found: { path: string; size: number; line?: { line: number; text: string } | null }[] = [];
+    let scanned = 0;
+    let readBytes = 0;
+    let cut = false;
+    let viaIndex = false;
+    for (const target of targets) {
+      let indexed: WalkEntry[] | null = null;
+      if (!thorough) indexed = await computer.indexed(target, rawTermsOf(query), "content", signal);
+      if (indexed?.length) {
+        viaIndex = true;
+        for (const entry of indexed) if (!entry.isDirectory && !ignored(entry.path)) found.push({ path: entry.path, size: entry.size });
+        continue;
+      }
+      for await (const entry of computer.walk(target, (name) => !IGNORED_DIRS.has(name), signal)) {
+        signal?.throwIfAborted();
+        scanned += 1;
+        if (scanned > MAX_SCANNED) {
+          cut = true;
+          break;
+        }
+        if (entry.isDirectory || !TEXT_FILE.test(entry.path) || entry.size > MAX_READ_BYTES) continue;
+        if (readBytes + entry.size > MAX_SCAN_BYTES) {
+          cut = true;
+          break;
+        }
+        readBytes += entry.size;
+        let content: string;
+        try {
+          content = decodeText(await computer.readBytes(entry.path), entry.path);
+        } catch {
+          continue;
+        }
+        if (hasAllTerms(content, terms)) found.push({ path: entry.path, size: entry.size, line: snippetOf(content, terms) });
+      }
+      if (cut) break;
+    }
+
+    const shown = found.slice(0, TEXT_SEARCH_LIMIT);
+    for (const hit of shown) {
+      if (hit.line !== undefined || !TEXT_FILE.test(hit.path) || hit.size > MAX_READ_BYTES) continue;
+      signal?.throwIfAborted();
+      try {
+        hit.line = snippetOf(decodeText(await computer.readBytes(hit.path), hit.path), terms);
+      } catch {
+        hit.line = null;
+      }
+    }
+
+    const notes = [
+      cut ? `Stopped after ${bytes(scanned)} entries or ${bytes(MAX_SCAN_BYTES)} bytes read; narrow it with 'path'.` : "",
+      viaIndex ? INDEX_NOTE : "",
+      "Only text files are read when scanning; PDF, Word and Excel are found through the index when it has them, and opened with ReadComputerFile.",
+    ].filter(Boolean);
+    if (found.length === 0) {
+      return [`No file contains all of [${terms.join(", ")}] in ${wanted || "the granted folders"} (read ${bytes(scanned)} entries).`, ...notes].join(" ");
+    }
+    const lines = shown.map((hit) => {
+      if (hit.line) return `${hit.path}:${hit.line.line}: ${hit.line.text}`;
+      return DOCUMENT.test(hit.path) ? `${hit.path}  (document)` : hit.path;
+    });
+    if (found.length > TEXT_SEARCH_LIMIT) lines.push(`... and ${found.length - TEXT_SEARCH_LIMIT} more files; add words or set 'path'`);
+    return [...lines, ...notes].join("\n");
   }
 
   async function read(args: ToolArgs): Promise<string> {
@@ -84,16 +194,37 @@ export function computerTools(computer: ComputerPort): ToolRegistry {
     const info = await computer.stat(path);
     if (!info.exists) throw new ToolError(`File does not exist: ${path}`);
     if (info.isDirectory) throw new ToolError(`'${path}' is a folder, not a file. Use ListComputerFolder`);
+    const offset = args.offset === undefined || args.offset === null ? 0 : args.offset;
+    if (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0) throw new ToolError("'offset' must be a whole number, 0 or more");
+
+    if (DOCUMENT.test(path)) {
+      if (info.size > MAX_DOCUMENT_BYTES) {
+        throw new ToolError(`'${path}' is ${bytes(info.size)} bytes, over the ${bytes(MAX_DOCUMENT_BYTES)} that can be read.`);
+      }
+      const key = `${path}|${info.size}`;
+      let content = documents.get(key);
+      if (content === undefined) {
+        content = await computer.document(path);
+        documents.set(key, content);
+        if (documents.size > CACHED_DOCUMENTS) documents.delete(documents.keys().next().value!);
+      }
+      if (!content.trim()) {
+        throw new ToolError(`'${path}' has no text to read: it is probably scanned images, which cannot be read yet.`);
+      }
+      return pageOf(content, offset);
+    }
+
     if (info.size > MAX_READ_BYTES) {
       throw new ToolError(`'${path}' is ${bytes(info.size)} bytes, over the ${bytes(MAX_READ_BYTES)} that can be read at once.`);
     }
-    return decodeText(await computer.readBytes(path), path);
+    return pageOf(decodeText(await computer.readBytes(path), path), offset);
   }
 
   return {
     RequestComputerAccess: { run: requestAccess, preview: async (args) => `Motivo: ${optionalText(args, "reason", "")}` },
     ListComputerFolder: { run: listFolder },
     SearchComputer: { run: search },
+    SearchComputerText: { run: searchText },
     ReadComputerFile: { run: read },
   };
 }

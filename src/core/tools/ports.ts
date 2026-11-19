@@ -55,6 +55,14 @@ export interface ComputerPort {
   stat(path: string): Promise<FileInfo>;
   list(path: string): Promise<DirectoryEntry[]>;
   readBytes(path: string): Promise<Uint8Array>;
+  /** The text of a PDF, Word or Excel file. */
+  document(path: string): Promise<string>;
+  /**
+   * What the computer's own search index finds under a granted path: files and folders whose
+   * name has every term, or whose contents do. Fast, but only as complete as the index; null
+   * when there is no index to ask. Already fenced to the grant, without credentials or keys.
+   */
+  indexed(path: string, terms: string[], kind: "name" | "content", signal?: AbortSignal): Promise<WalkEntry[] | null>;
   walk(path: string, enter: (name: string) => boolean, signal?: AbortSignal): AsyncIterable<WalkEntry>;
 }
 

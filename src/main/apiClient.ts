@@ -89,7 +89,13 @@ export class ApiClient implements ServerApiPort {
    * `signal` replaces the 30-second deadline, for an answer read as it streams: a fixed
    * deadline also covers reading the body, and cut long spoken audio off partway.
    */
-  async binary(path: string, body: Uint8Array | object, accept: string, signal?: AbortSignal): Promise<Response> {
+  async binary(
+    path: string,
+    body: Uint8Array | object,
+    accept: string,
+    signal?: AbortSignal,
+    contentType = "audio/wav",
+  ): Promise<Response> {
     const { baseUrl } = await this.connection.load();
     if (!baseUrl) throw new ApiError(0, "not_connected", "No server is connected yet.");
 
@@ -97,7 +103,7 @@ export class ApiClient implements ServerApiPort {
     const raw = body instanceof Uint8Array;
     const headers: Record<string, string> = {
       Accept: accept,
-      "Content-Type": raw ? "audio/wav" : "application/json",
+      "Content-Type": raw ? contentType : "application/json",
     };
     if (token) headers.Authorization = `Bearer ${token}`;
 

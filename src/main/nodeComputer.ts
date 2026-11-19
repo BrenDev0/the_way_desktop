@@ -4,6 +4,9 @@ import { isSensitive, PROTECTED, splitComputerPath } from "../core/computer/acce
 import { ToolError } from "../core/tools/contract";
 import type { ComputerPort, DirectoryEntry, FileInfo, WalkEntry } from "../core/tools/ports";
 import type { ComputerGrants } from "./computerGrants";
+import type { SearchKind, SystemSearch } from "./systemSearch";
+
+const MAX_INDEXED = 500;
 
 /**
  * The folders the user granted, read-only. There is no write here by construction. The fence
@@ -15,6 +18,8 @@ export class NodeComputer implements ComputerPort {
   constructor(
     private readonly store: ComputerGrants,
     private readonly pick: (reason: string) => Promise<string | null>,
+    private readonly extract: (name: string, data: Uint8Array) => Promise<string>,
+    private readonly system: SystemSearch | null = null,
   ) {}
 
   async grants(): Promise<{ label: string }[]> {
@@ -42,6 +47,37 @@ export class NodeComputer implements ComputerPort {
     const { absolute, rest } = await this.inside(path);
     if (isSensitive(rest)) throw new ToolError(PROTECTED);
     return new Uint8Array(await readFile(absolute));
+  }
+
+  async document(path: string): Promise<string> {
+    const data = await this.readBytes(path);
+    return this.extract(path.split("/").pop() ?? path, data);
+  }
+
+  async indexed(path: string, terms: string[], kind: SearchKind, signal?: AbortSignal): Promise<WalkEntry[] | null> {
+    if (!this.system) return null;
+    const { absolute, label, rest } = await this.inside(path);
+    if (isSensitive(rest)) return [];
+    const realScope = await realpath(absolute).catch(() => null);
+    const grant = (await this.store.list()).find((g) => g.label === label);
+    const realRoot = grant ? await realpath(grant.path).catch(() => null) : null;
+    if (!realScope || !realRoot) return null;
+
+    const found = await this.system.search(realScope, terms, kind, signal);
+    if (!found) return null;
+
+    const entries: WalkEntry[] = [];
+    for (const file of found.slice(0, MAX_INDEXED)) {
+      signal?.throwIfAborted();
+      const real = await realpath(file).catch(() => null);
+      if (!real) continue;
+      const offset = relative(realRoot, real);
+      if (!offset || offset.startsWith("..") || isAbsolute(offset) || isSensitive(offset)) continue;
+      const info = await stat(real).catch(() => null);
+      if (!info) continue;
+      entries.push({ path: `${label}/${offset.split(sep).join("/")}`, isDirectory: info.isDirectory(), size: info.isDirectory() ? 0 : info.size });
+    }
+    return entries;
   }
 
   async list(path: string): Promise<DirectoryEntry[]> {

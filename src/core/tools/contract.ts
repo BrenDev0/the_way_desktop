@@ -36,7 +36,13 @@ export const BROWSER_TOOLS = [
 
 export const COMMAND_TOOLS = ["RunCommand"] as const;
 
-export const COMPUTER_TOOLS = ["RequestComputerAccess", "ListComputerFolder", "SearchComputer", "ReadComputerFile"] as const;
+export const COMPUTER_TOOLS = [
+  "RequestComputerAccess",
+  "ListComputerFolder",
+  "SearchComputer",
+  "SearchComputerText",
+  "ReadComputerFile",
+] as const;
 
 export const GIT_TOOLS = [
   "GitStatus",

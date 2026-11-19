@@ -43,6 +43,7 @@ const TOOLS: Record<string, [label: string, place: Place]> = {
   RequestComputerAccess: ["Pedir acceso a una carpeta", "equipo"],
   ListComputerFolder: ["Listar carpeta con acceso", "equipo"],
   SearchComputer: ["Buscar en el equipo", "equipo"],
+  SearchComputerText: ["Buscar texto en el equipo", "equipo"],
   ReadComputerFile: ["Leer archivo del equipo", "equipo"],
   OverlayImage: ["Superponer imagen", "proyecto"],
   GenerateImages: ["Generar imágenes", "proyecto"],

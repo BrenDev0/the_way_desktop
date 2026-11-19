@@ -20,8 +20,10 @@ import { BACKGROUND, setUpAppearance } from "./appearance";
 import { ConversationEvents } from "./conversationEvents";
 import { DockWindow } from "./dockWindow";
 import { ComputerGrants } from "./computerGrants";
+import { DocumentApi } from "./documentApi";
 import { ElectronBrowser } from "./electronBrowser";
 import { NodeComputer } from "./nodeComputer";
+import { systemSearchFor } from "./systemSearch";
 import { registerAppHandlers, type AppServices } from "./ipc";
 import { replacedByNewerVersion } from "./macBundle";
 import { NodeFileSystem } from "./nodeFileSystem";
@@ -191,6 +193,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
   // One fenced file system and one projects client, shared by the agent's tools and the files panel.
   const fileSystem = new NodeFileSystem(() => workspace.current());
   const computerGrants = new ComputerGrants(userData);
+  const documents = new DocumentApi(api);
   const computer = new NodeComputer(computerGrants, async (reason) => {
     const options = {
       title: "Dar acceso de solo lectura a una carpeta",
@@ -200,7 +203,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     };
     const picked = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
     return picked.canceled ? null : picked.filePaths[0] ?? null;
-  });
+  }, (name, data) => documents.text(name, data), systemSearchFor(process.platform));
   const projects = new ProjectsApi(api);
 
   const runner = new ToolRunner(
