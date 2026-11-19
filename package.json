@@ -1,7 +1,7 @@
 {
   "name": "da-the-way",
   "productName": "THE WAY",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Operator desktop client for THE WAY",
   "private": true,
   "main": ".vite/build/main.js",
