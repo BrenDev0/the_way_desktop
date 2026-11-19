@@ -4,6 +4,7 @@ module.exports = {
     executableName: "the-way",
     // no extension: the packager picks icon.ico on Windows and icon.icns on macOS
     icon: "assets/icon",
+    extendInfo: { NSMicrophoneUsageDescription: "THE WAY usa el micrófono para que puedas hablar con AGENTIX." },
     // the Start menu folder is named after the company: Electron's own otherwise ("GitHub, Inc.")
     win32metadata: { CompanyName: "THE WAY", ProductName: "THE WAY", FileDescription: "THE WAY" },
   },

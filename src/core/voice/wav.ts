@@ -28,6 +28,15 @@ export function encodeWav(samples: Int16Array, sampleRate = RECORD_RATE): Uint8A
   return new Uint8Array(buffer);
 }
 
+/** Below this, nothing was picked up: a muted or blocked microphone, not a quiet voice. */
+const SILENCE_PEAK = 150;
+
+export function isSilent(samples: Int16Array): boolean {
+  let peak = 0;
+  for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+  return peak < SILENCE_PEAK;
+}
+
 /** Web Audio's floats in [-1, 1] as 16-bit samples. */
 export function toInt16(floats: Float32Array): Int16Array {
   const out = new Int16Array(floats.length);

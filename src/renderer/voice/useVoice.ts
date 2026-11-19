@@ -41,7 +41,7 @@ export function useVoice({ onTranscript }: Options) {
   /** The open microphone, opening it first if voice was off. */
   const ensureMic = useCallback(async (): Promise<Microphone> => {
     if (mic.current) return mic.current;
-    opening.current ??= Microphone.open().finally(() => { opening.current = null; });
+    opening.current ??= openMicrophone().finally(() => { opening.current = null; });
     const opened = await opening.current;
     mic.current = opened;
     setOn(true);
@@ -90,6 +90,10 @@ export function useVoice({ onTranscript }: Options) {
 
     const wav = current.stop();
     if (!wav) return;
+    if (wav === "silent") {
+      setError(silentError());
+      return;
+    }
     setTranscribing(true);
     try {
       const text = (await window.desktop.voice.transcribe(wav)).trim();
@@ -186,10 +190,28 @@ export function useVoice({ onTranscript }: Options) {
   };
 }
 
+const onMac = () => /Mac/i.test(navigator.userAgent);
+const MAC_SETTINGS = "Ajustes del Sistema › Privacidad y seguridad › Micrófono";
+
+async function openMicrophone(): Promise<Microphone> {
+  if ((await window.desktop.voice.microphoneAccess()) === "denied") {
+    throw new DOMException("Microphone access denied", "NotAllowedError");
+  }
+  return Microphone.open();
+}
+
+function silentError(): string {
+  return onMac()
+    ? `No se escuchó nada. Revisa que el micrófono esté activo y que THE WAY tenga permiso en ${MAC_SETTINGS}.`
+    : "No se escuchó nada. Revisa que el micrófono esté activo y no silenciado.";
+}
+
 function micError(reason: unknown): string {
   const name = reason instanceof DOMException ? reason.name : "";
   if (name === "NotAllowedError" || name === "SecurityError") {
-    return "No se pudo usar el micrófono. Revisa los permisos de micrófono de Windows.";
+    return onMac()
+      ? `THE WAY no tiene permiso para usar el micrófono. Actívalo en ${MAC_SETTINGS} y vuelve a intentarlo.`
+      : "No se pudo usar el micrófono. Revisa los permisos de micrófono de Windows.";
   }
   if (name === "NotFoundError") return "No se encontró ningún micrófono.";
   return "No se pudo abrir el micrófono.";

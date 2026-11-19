@@ -1,5 +1,5 @@
 import { CaptureBuffer } from "../../core/voice/capture";
-import { RECORD_RATE, encodeWav, toInt16 } from "../../core/voice/wav";
+import { RECORD_RATE, encodeWav, isSilent, toInt16 } from "../../core/voice/wav";
 
 /** Batches the render quantum's 128 frames into tenth-of-a-second chunks, so the window
  *  gets ten messages a second rather than a hundred and twenty-five. Inlined as a blob:
@@ -72,10 +72,12 @@ export class Microphone {
     this.buffer.start();
   }
 
-  /** The recording as wav, or null when it was too short to be speech. */
-  stop(): Uint8Array | null {
+  /** The recording as wav, null when it was too short to be speech, or "silent" when nothing
+   *  was picked up -- sent to the transcriber, silence comes back as a made-up phrase. */
+  stop(): Uint8Array | "silent" | null {
     const samples = this.buffer.stop();
-    return samples ? encodeWav(samples) : null;
+    if (!samples) return null;
+    return isSilent(samples) ? "silent" : encodeWav(samples);
   }
 
   cancel(): void {

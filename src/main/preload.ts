@@ -117,6 +117,7 @@ const desktop: DesktopBridge = {
       }
     },
     warm: () => ipcRenderer.invoke(CHANNELS.voiceWarm) as Promise<void>,
+    microphoneAccess: () => ipcRenderer.invoke(CHANNELS.voiceMicAccess) as Promise<"granted" | "denied">,
   },
   dock: {
     tasks: () => ipcRenderer.invoke(CHANNELS.dockTasks),

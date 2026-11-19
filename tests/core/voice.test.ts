@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CaptureBuffer } from "../../src/core/voice/capture";
 import { SentenceSplitter, spoken } from "../../src/core/voice/sentences";
-import { encodeWav, pcmToFloat, toInt16 } from "../../src/core/voice/wav";
+import { encodeWav, isSilent, pcmToFloat, toInt16 } from "../../src/core/voice/wav";
 
 describe("SentenceSplitter", () => {
   it("hands over each sentence once it is complete, in order", () => {
@@ -84,5 +84,21 @@ describe("wav", () => {
     const pcm = new Uint8Array(toInt16(new Float32Array([0, 0.5, -1])).buffer);
 
     expect(Array.from(pcmToFloat(pcm)).map((x) => Math.round(x * 100) / 100)).toEqual([0, 0.5, -1]);
+  });
+});
+
+describe("isSilent", () => {
+  it("is true for the zeros a blocked microphone delivers", () => {
+    expect(isSilent(new Int16Array(16_000))).toBe(true);
+  });
+
+  it("is true for a faint hiss no one could have spoken", () => {
+    expect(isSilent(Int16Array.from({ length: 16_000 }, (_, i) => (i % 2 ? 40 : -40)))).toBe(true);
+  });
+
+  it("is false for a quiet voice", () => {
+    const quiet = Int16Array.from({ length: 16_000 }, (_, i) => Math.round(Math.sin(i / 20) * 600));
+
+    expect(isSilent(quiet)).toBe(false);
   });
 });

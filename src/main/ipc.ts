@@ -14,6 +14,7 @@ import { installUpdate, type InstallerLink } from "../core/installUpdate";
 import { checkFrom, failedCheck, type AppVersionAnswer } from "../core/update";
 import { LocalFilesError, type LocalFiles } from "../core/workspace/localFiles";
 import { FriendlyError, friendly } from "../core/userMessages";
+import { microphoneAccess } from "./micAccess";
 import { NodeUpdater } from "./nodeUpdater";
 import { operatorMessage } from "../core/workspace/messages";
 import type { NodeFileSystem } from "./nodeFileSystem";
@@ -347,6 +348,7 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     });
   });
   handle(CHANNELS.voiceWarm, () => services.voice.warm());
+  handle(CHANNELS.voiceMicAccess, () => microphoneAccess());
 
   handle(CHANNELS.toolsCheck, async (): Promise<ToolCheck> => {
     const offered = await services.api.request<{ name: string }[]>("GET", "/desktop-tools");

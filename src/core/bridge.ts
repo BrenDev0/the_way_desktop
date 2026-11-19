@@ -178,6 +178,9 @@ export interface DesktopBridge {
     speak(text: string, chunk: (pcm: Uint8Array) => void): Promise<void>;
     /** Voice was turned on: get the connection to the speech service ready. */
     warm(): Promise<void>;
+    /** Whether this app may use the microphone. On a Mac it asks the system once, if it has not
+     *  been asked; it never asks again once the person has answered. */
+    microphoneAccess(): Promise<"granted" | "denied">;
   };
   /**
    * The task icons on the screen edge. The dock window uses the first group; the main
@@ -283,6 +286,7 @@ export const CHANNELS = {
   /** main -> window: a piece of the audio a voiceSpeak call is streaming, by its stream id */
   voiceChunk: "voice:chunk",
   voiceWarm: "voice:warm",
+  voiceMicAccess: "voice:mic-access",
   dockTasks: "dock:tasks",
   dockTasksChanged: "dock:tasks-changed",
   dockStop: "dock:stop",
