@@ -358,6 +358,46 @@ describe("SearchComputer and the system index", () => {
   });
 });
 
+describe("SearchComputer when no name matches", () => {
+  const files = {
+    "Descargas/test.txt": "Mi reseña de Fingerprints of the Gods\nun libro fascinante",
+    "Descargas/otro.txt": "nada que ver",
+  };
+
+  it("goes on to search inside the files, so a note called test is found by what it says", async () => {
+    const result = await tools(new FakeComputer(files)).SearchComputer.run({ query: "fingerprints gods" });
+
+    expect(result).toMatch(/^Nothing matches all of \[fingerprints, gods\] by name/);
+    expect(result).toContain("Searching inside the files instead:");
+    expect(result).toContain("Descargas/test.txt:1: Mi reseña de Fingerprints of the Gods");
+    expect(result).not.toContain("otro.txt");
+  });
+
+  it("does not search inside files when a name matched", async () => {
+    const result = await tools(new FakeComputer(files)).SearchComputer.run({ query: "test" });
+
+    expect(result).toBe("Descargas/test.txt");
+  });
+
+  it("says both searches found nothing when neither did", async () => {
+    const result = await tools(new FakeComputer(files)).SearchComputer.run({ query: "zzzqqq" });
+
+    expect(result).toMatch(/Nothing matches all of \[zzzqqq\] by name/);
+    expect(result).toMatch(/No file contains all of \[zzzqqq\]/);
+  });
+
+  it("passes the folder it was limited to, and thorough, on to the search inside", async () => {
+    const computer = new FakeComputer({ ...files, "Otra/test.txt": "fingerprints gods tambien" });
+    computer.index.content = [file("Descargas/otro.txt")];
+
+    const result = await tools(computer).SearchComputer.run({ query: "fingerprints gods", path: "Otra", thorough: true });
+
+    expect(result).toContain("Otra/test.txt");
+    expect(result).not.toContain("Descargas/test.txt");
+    expect(computer.indexCalls).toEqual([]);
+  });
+});
+
 describe("SearchComputerText", () => {
   const files = {
     "Documentos/notas.txt": "primera linea\nel contrato con Acme vence en mayo\nfin",
@@ -498,10 +538,10 @@ describe("computer paths", () => {
   });
 
   it("knows program and app data inside a user's folder, but keeps iCloud Drive and the Library itself", () => {
-    for (const path of ["AppData/Local/x", "appdata", ".cache/pip", ".config/gcloud", "NTUSER.DAT", "Library/Caches/x", "library/Preferences"]) {
+    for (const path of ["AppData/Local/x", "appdata", ".cache/pip", ".config/gcloud", ".claude/projects/x.jsonl", ".vscode", ".copilot/a", "NTUSER.DAT", "Library/Caches/x", "library/Preferences"]) {
       expect(isHomeNoise(path), path).toBe(true);
     }
-    for (const path of ["Desktop/a.txt", "Documents/AppData/a.txt", "Library", "Library/Mobile Documents/x", "OneDrive/a.docx"]) {
+    for (const path of ["Desktop/a.txt", "Documents/AppData/a.txt", "Documents/.oculta/a.txt", "Library", "Library/Mobile Documents/x", "OneDrive/a.docx"]) {
       expect(isHomeNoise(path), path).toBe(false);
     }
   });

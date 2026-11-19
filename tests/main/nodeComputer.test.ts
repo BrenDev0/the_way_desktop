@@ -376,6 +376,8 @@ describe("searching the user's own folder", () => {
       "Library/Mobile Documents/com~apple~CloudDocs/nube-acme.txt": "acme en icloud",
       "AppData/Local/Chrome/acme.txt": "acme appdata",
       ".config/gcloud/acme.txt": "acme config",
+      ".claude/projects/chat.jsonl": "acme claude transcript",
+      ".vscode/settings.json": "acme vscode",
       ".ssh/id_rsa": "key",
       ".env": "SECRET=1",
       "NTUSER.DAT": "registro",
@@ -420,6 +422,8 @@ describe("searching the user's own folder", () => {
     const result = await tools.SearchComputerText.run({ query: "contrato acme" });
 
     expect(result).toContain("Usuario/Documents/contratos/acme.txt:1: contrato de acme");
+    expect(result).not.toContain(".claude");
+    expect(result).not.toContain(".vscode");
     expect(result).not.toContain("AppData");
     expect(result).not.toContain("Caches");
   });
@@ -429,6 +433,8 @@ describe("searching the user's own folder", () => {
     await tools.RequestComputerAccess.run({ reason: "buscar" });
 
     expect(await tools.ListComputerFolder.run({ path: "Usuario" })).toBe("Desktop/\nDocuments/\nLibrary/");
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/.claude/projects/chat.jsonl" })).rejects.toThrow(/program or app data/);
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/.vscode/settings.json" })).rejects.toThrow(/program or app data/);
     expect(await tools.ListComputerFolder.run({ path: "Usuario/Library" })).toBe("Mobile Documents/");
     await expect(tools.ReadComputerFile.run({ path: "Usuario/AppData/Local/Chrome/acme.txt" })).rejects.toThrow(/program or app data/);
     await expect(tools.ReadComputerFile.run({ path: "Usuario/Library/Caches/basura.txt" })).rejects.toThrow(/program or app data/);

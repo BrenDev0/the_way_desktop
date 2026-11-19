@@ -41,11 +41,11 @@ export function isSensitive(path: string): boolean {
 
 const HOME_NOISE = new Set(["appdata", "application data", "local settings", ".cache", ".local", ".config", ".npm", ".nvm", ".gradle", ".m2", ".cargo", ".rustup"]);
 
-/** Program and app data inside a user's folder: never what anyone means by "my file". */
+/** Program and app data inside a user's folder -- and every hidden folder at its top (.claude, .vscode, .config...), which holds tools' data and logs, not what anyone means by "my file". */
 export function isHomeNoise(path: string): boolean {
   const parts = path.replaceAll("\\", "/").split("/").filter(Boolean);
   const first = parts[0] ?? "";
-  if (HOME_NOISE.has(first.toLowerCase()) || /^ntuser\./i.test(first)) return true;
+  if (HOME_NOISE.has(first.toLowerCase()) || /^ntuser\./i.test(first) || first.startsWith(".")) return true;
   return first.toLowerCase() === "library" && parts.length > 1 && parts[1].toLowerCase() !== "mobile documents";
 }
 

@@ -12,6 +12,16 @@ describe("folding text for searching", () => {
     expect(termsOf("  ,, ")).toEqual([]);
   });
 
+  it("drops filler words in English and Spanish, so a long question still finds the file", () => {
+    expect(termsOf("review of fingerprints of the gods")).toEqual(["review", "fingerprints", "gods"]);
+    expect(rawTermsOf("la reseña de Fingerprints of the Gods")).toEqual(["reseña", "fingerprints", "gods"]);
+  });
+
+  it("keeps a query that is nothing but filler words, rather than search for nothing", () => {
+    expect(termsOf("the of")).toEqual(["the", "of"]);
+    expect(rawTermsOf("Y el")).toEqual(["y", "el"]);
+  });
+
   it("needs every word", () => {
     expect(hasAllTerms("El Contrato con ACME", ["contrato", "acme"])).toBe(true);
     expect(hasAllTerms("El Contrato", ["contrato", "acme"])).toBe(false);

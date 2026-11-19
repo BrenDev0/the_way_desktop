@@ -135,7 +135,8 @@ export function computerTools(computer: ComputerPort, audit?: ComputerAudit): To
       viaIndex ? INDEX_NOTE : "",
     ].filter(Boolean);
     if (hits.size === 0) {
-      return [`Nothing matches all of [${terms.join(", ")}] in ${wanted || "the granted folders"} (searched ${bytes(scanned)} entries).`, ...notes].join(" ");
+      const head = [`Nothing matches all of [${terms.join(", ")}] by name in ${wanted || "the granted folders"} (searched ${bytes(scanned)} entries).`, ...notes].join(" ");
+      return `${head}\nSearching inside the files instead:\n${await searchText(args, signal)}`;
     }
     const ranked = [...hits.values()].sort((a, b) => b.nameHits - a.nameHits || a.path.length - b.path.length || a.path.localeCompare(b.path));
     const lines = ranked.slice(0, SEARCH_LIMIT).map((h) => (h.isDirectory ? `${h.path}/` : h.cloudOnly ? `${h.path}  (${CLOUD})` : h.path));
