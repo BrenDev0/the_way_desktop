@@ -38,14 +38,14 @@ export function ComputerAccess() {
   return (
     <div className="place__body place__access">
       <p className="place__hint">
-        Carpetas de solo lectura: AGENTIX puede buscar y leer en ellas, nunca modificarlas. Te pedirá acceso cuando lo necesite.
+        Solo lectura: AGENTIX puede buscar y leer, nunca modificar. Cuando necesite encontrar un archivo te pedirá permiso para buscar en tu equipo.
         Lo que lea se envía al servidor y al proveedor de IA para poder responderte.
       </p>
       {grants.length ? (
         <ul className="place__folders" aria-label="Carpetas con acceso de lectura">
           {grants.map((grant) => (
             <li key={grant.id} className="place__current">
-              <span className="selectable" title={grant.path}>{grant.label}</span>
+              <span className="selectable" title={grant.path}>{grant.kind === "home" ? `${grant.label} · toda tu carpeta de usuario` : grant.label}</span>
               <button type="button" className="ghost-button" onClick={() => void change(() => window.desktop.computer.remove(grant.id), setGrants)}>
                 QUITAR
               </button>
@@ -53,8 +53,13 @@ export function ComputerAccess() {
           ))}
         </ul>
       ) : <p className="place__none">Ninguna carpeta con acceso todavía.</p>}
+      {!grants.some((grant) => grant.kind === "home") && (
+        <button type="button" className="ghost-button place__choose" onClick={() => void change(window.desktop.computer.addHome, setGrants)}>
+          ◎ PERMITIR BÚSQUEDA EN MI EQUIPO
+        </button>
+      )}
       <button type="button" className="ghost-button place__choose" onClick={() => void change(window.desktop.computer.add, setGrants)}>
-        ▣ AÑADIR CARPETA…
+        ▣ AÑADIR UNA CARPETA…
       </button>
 
       <div className="place__log-head">

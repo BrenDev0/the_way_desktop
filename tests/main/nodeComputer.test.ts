@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { computerTools } from "../../src/core/tools/computer";
 import { ComputerGrants } from "../../src/main/computerGrants";
 import { ComputerLog } from "../../src/main/computerLog";
-import { NodeComputer, type NodeComputerOptions } from "../../src/main/nodeComputer";
+import { NodeComputer, type ComputerPrompts, type NodeComputerOptions } from "../../src/main/nodeComputer";
 import type { SearchKind, SystemSearch } from "../../src/main/systemSearch";
 
 let base: string;
@@ -36,10 +36,21 @@ async function computer(picks: (string | null)[] = [], options: NodeComputerOpti
   const grants = new ComputerGrants(data);
   await grants.claim("ana");
   const queue = [...picks];
+  const next = () => queue.shift() ?? null;
+  const asked: string[] = [];
   const extracted: { name: string; text: string }[] = [];
+  const prompts: ComputerPrompts = {
+    ask: async (reason) => {
+      asked.push(reason);
+      const picked = next();
+      if (picked === null) return null;
+      return picked === "HOME" ? { kind: "home" } : { kind: "folder", path: picked };
+    },
+    folder: async () => next(),
+  };
   const access = new NodeComputer(
     grants,
-    async () => queue.shift() ?? null,
+    prompts,
     async (name, data) => {
       const text = new TextDecoder().decode(data);
       extracted.push({ name, text });
@@ -47,7 +58,7 @@ async function computer(picks: (string | null)[] = [], options: NodeComputerOpti
     },
     options,
   );
-  return { grants, access, extracted, tools: computerTools(access) };
+  return { grants, access, extracted, asked, tools: computerTools(access) };
 }
 
 describe("ComputerGrants", () => {
@@ -105,7 +116,7 @@ describe("NodeComputer", () => {
   it("reports no grant when the user cancels the picker", async () => {
     const { tools, grants } = await computer([null]);
 
-    expect(await tools.RequestComputerAccess.run({ reason: "buscar" })).toMatch(/did not pick a folder/);
+    expect(await tools.RequestComputerAccess.run({ reason: "buscar" })).toMatch(/did not allow it/);
     expect(await grants.list()).toEqual([]);
   });
 
@@ -350,5 +361,146 @@ describe("NodeComputer and the record", () => {
     await access.choose("buscar");
 
     expect(await log.recent()).toEqual([]);
+  });
+});
+
+describe("searching the user's own folder", () => {
+  let home: string;
+
+  beforeEach(async () => {
+    home = join(base, "home");
+    const files: Record<string, string> = {
+      "Desktop/informe-acme.txt": "informe de acme",
+      "Documents/contratos/acme.txt": "contrato de acme",
+      "Library/Caches/basura.txt": "acme cache",
+      "Library/Mobile Documents/com~apple~CloudDocs/nube-acme.txt": "acme en icloud",
+      "AppData/Local/Chrome/acme.txt": "acme appdata",
+      ".config/gcloud/acme.txt": "acme config",
+      ".ssh/id_rsa": "key",
+      ".env": "SECRET=1",
+      "NTUSER.DAT": "registro",
+    };
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(join(home, path, ".."), { recursive: true });
+      await writeFile(join(home, path), content);
+    }
+  });
+
+  const allowed = (options: NodeComputerOptions = {}) => computer(["HOME"], { home, ...options });
+
+  it("asks the user once, then has the whole folder under a label of its own", async () => {
+    const { tools, asked } = await allowed();
+
+    const first = await tools.RequestComputerAccess.run({ reason: "Buscar el informe de Acme" });
+    const second = await tools.RequestComputerAccess.run({ reason: "otra vez" });
+
+    expect(first).toContain("whole folder, 'Usuario'");
+    expect(first).toContain("SearchComputer");
+    expect(second).toContain("whole folder, 'Usuario'");
+    expect(asked).toEqual(["Buscar el informe de Acme"]);
+  });
+
+  it("finds a file wherever it is in the user's folder, without being told where", async () => {
+    const { tools } = await allowed();
+    await tools.RequestComputerAccess.run({ reason: "buscar" });
+
+    const result = await tools.SearchComputer.run({ query: "acme" });
+
+    expect(result.split("\n").sort()).toEqual([
+      "Usuario/Desktop/informe-acme.txt",
+      "Usuario/Documents/contratos/acme.txt",
+      "Usuario/Library/Mobile Documents/com~apple~CloudDocs/nube-acme.txt",
+    ]);
+  });
+
+  it("finds text inside files, too", async () => {
+    const { tools } = await allowed();
+    await tools.RequestComputerAccess.run({ reason: "buscar" });
+
+    const result = await tools.SearchComputerText.run({ query: "contrato acme" });
+
+    expect(result).toContain("Usuario/Documents/contratos/acme.txt:1: contrato de acme");
+    expect(result).not.toContain("AppData");
+    expect(result).not.toContain("Caches");
+  });
+
+  it("leaves out program and app data, and what holds credentials", async () => {
+    const { tools } = await allowed();
+    await tools.RequestComputerAccess.run({ reason: "buscar" });
+
+    expect(await tools.ListComputerFolder.run({ path: "Usuario" })).toBe("Desktop/\nDocuments/\nLibrary/");
+    expect(await tools.ListComputerFolder.run({ path: "Usuario/Library" })).toBe("Mobile Documents/");
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/AppData/Local/Chrome/acme.txt" })).rejects.toThrow(/program or app data/);
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/Library/Caches/basura.txt" })).rejects.toThrow(/program or app data/);
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/.config/gcloud/acme.txt" })).rejects.toThrow(/program or app data/);
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/NTUSER.DAT" })).rejects.toThrow(/program or app data/);
+    await expect(tools.ReadComputerFile.run({ path: "Usuario/.env" })).rejects.toThrow(/credentials or keys/);
+  });
+
+  it("does not hide folders of those names in a folder the user picked by hand", async () => {
+    const picked = join(base, "elegida");
+    await mkdir(join(picked, "AppData"), { recursive: true });
+    await writeFile(join(picked, "AppData", "nota.txt"), "mis notas");
+    const { tools } = await computer([picked]);
+    await tools.RequestComputerAccess.run({ reason: "buscar" });
+
+    expect(await tools.ReadComputerFile.run({ path: "elegida/AppData/nota.txt" })).toBe("mis notas");
+  });
+
+  it("filters the index's answers the same way", async () => {
+    const system: SystemSearch = {
+      search: async () => [
+        join(home, "Desktop", "informe-acme.txt"),
+        join(home, "AppData", "Local", "Chrome", "acme.txt"),
+        join(home, "Library", "Caches", "basura.txt"),
+        join(home, ".env"),
+        join(home, "Library", "Mobile Documents", "com~apple~CloudDocs", "nube-acme.txt"),
+      ],
+    };
+    const { access } = await allowed({ system });
+    await access.choose("buscar");
+
+    const found = await access.indexed("Usuario", ["acme"], "name");
+
+    expect(found?.map((entry) => entry.path)).toEqual([
+      "Usuario/Desktop/informe-acme.txt",
+      "Usuario/Library/Mobile Documents/com~apple~CloudDocs/nube-acme.txt",
+    ]);
+  });
+
+  it("is remembered, and a person can add it by hand and take it back", async () => {
+    const { grants, access } = await allowed();
+
+    await access.addHome();
+    await access.addHome();
+
+    expect((await grants.list()).map((grant) => [grant.label, grant.kind])).toEqual([["Usuario", "home"]]);
+    const again = new ComputerGrants(data);
+    await again.claim("ana");
+    expect((await again.list())[0].kind).toBe("home");
+    expect(await again.remove((await again.list())[0].id)).toEqual([]);
+  });
+
+  it("is not granted when the user refuses, and says so to the agent", async () => {
+    const { tools, grants } = await computer([null], { home });
+
+    expect(await tools.RequestComputerAccess.run({ reason: "buscar" })).toMatch(/did not allow it/);
+    expect(await grants.list()).toEqual([]);
+  });
+
+  it("still lets the user pick one folder instead, from the same question", async () => {
+    const { tools } = await computer([docs], { home });
+
+    expect(await tools.RequestComputerAccess.run({ reason: "buscar" })).toMatch(/Read-only access granted to 'Documentos'\. Use paths/);
+  });
+
+  it("notes the grant in the record, whichever way it was given", async () => {
+    const log = new ComputerLog(data);
+    await log.claim("ana");
+    const { tools } = await computer(["HOME"], { home, log });
+
+    await tools.RequestComputerAccess.run({ reason: "buscar" });
+
+    expect((await log.recent()).map((entry) => [entry.tool, entry.detail])).toEqual([["GrantAdded", "Usuario"]]);
   });
 });

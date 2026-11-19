@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSensitive, labelFor, splitComputerPath } from "../../src/core/computer/access";
+import { isHomeNoise, isSensitive, labelFor, splitComputerPath } from "../../src/core/computer/access";
 import { computerTools } from "../../src/core/tools/computer";
 import type { ComputerPort, DirectoryEntry, FileInfo, WalkEntry } from "../../src/core/tools/ports";
 
@@ -8,7 +8,7 @@ class FakeComputer implements ComputerPort {
   documentCalls: string[] = [];
   constructor(
     private readonly files: Record<string, string>,
-    private readonly pickNext: { label: string } | null = null,
+    private readonly pickNext: { label: string; home?: boolean } | null = null,
     private readonly texts: Record<string, string> = {},
   ) {}
 
@@ -79,6 +79,15 @@ class FakeComputer implements ComputerPort {
 const tools = (computer: ComputerPort) => computerTools(computer);
 
 describe("RequestComputerAccess", () => {
+  it("says the whole user folder was granted, and to start with a search", async () => {
+    const computer = new FakeComputer({}, { label: "Usuario", home: true });
+
+    const result = await tools(computer).RequestComputerAccess.run({ reason: "Buscar el contrato" });
+
+    expect(result).toContain("whole folder, 'Usuario'");
+    expect(result).toContain("Start with SearchComputer");
+  });
+
   it("says what was granted, and how to name paths in it", async () => {
     const computer = new FakeComputer({}, { label: "Documentos" });
 
@@ -92,7 +101,7 @@ describe("RequestComputerAccess", () => {
   it("tells the agent not to insist when the user picks nothing", async () => {
     const result = await tools(new FakeComputer({}, null)).RequestComputerAccess.run({ reason: "buscar" });
 
-    expect(result).toMatch(/did not pick a folder/);
+    expect(result).toMatch(/did not allow it/);
     expect(result).toMatch(/do not ask again/);
   });
 
@@ -486,6 +495,15 @@ describe("computer paths", () => {
 
   it("refuses to climb out", () => {
     expect(() => splitComputerPath("Documentos/../.ssh/id_rsa")).toThrow(/outside/);
+  });
+
+  it("knows program and app data inside a user's folder, but keeps iCloud Drive and the Library itself", () => {
+    for (const path of ["AppData/Local/x", "appdata", ".cache/pip", ".config/gcloud", "NTUSER.DAT", "Library/Caches/x", "library/Preferences"]) {
+      expect(isHomeNoise(path), path).toBe(true);
+    }
+    for (const path of ["Desktop/a.txt", "Documents/AppData/a.txt", "Library", "Library/Mobile Documents/x", "OneDrive/a.docx"]) {
+      expect(isHomeNoise(path), path).toBe(false);
+    }
   });
 
   it("knows credentials and keys", () => {

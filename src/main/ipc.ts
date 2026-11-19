@@ -164,7 +164,11 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
 
   handle(CHANNELS.computerGrants, () => services.computerGrants.list());
   handle(CHANNELS.computerGrantAdd, async () => {
-    await services.computer.choose("");
+    await services.computer.addFolder();
+    return services.computerGrants.list();
+  });
+  handle(CHANNELS.computerGrantAddHome, async () => {
+    await services.computer.addHome();
     return services.computerGrants.list();
   });
   handle(CHANNELS.computerGrantRemove, async (id) => {

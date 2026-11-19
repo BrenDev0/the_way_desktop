@@ -94,6 +94,8 @@ export interface DesktopBridge {
     grants(): Promise<ComputerGrant[]>;
     /** Opens the folder picker; the grants after it. */
     add(): Promise<ComputerGrant[]>;
+    /** Lets the agent search the user's whole folder; the grants after it. */
+    addHome(): Promise<ComputerGrant[]>;
     remove(id: string): Promise<ComputerGrant[]>;
     /** What the agent did on this computer, newest first. */
     log(): Promise<ComputerActivity[]>;
@@ -265,6 +267,7 @@ export const CHANNELS = {
   authSignedOut: "auth:signed-out",
   computerGrants: "computer:grants",
   computerGrantAdd: "computer:grant-add",
+  computerGrantAddHome: "computer:grant-add-home",
   computerGrantRemove: "computer:grant-remove",
   computerLog: "computer:log",
   computerLogClear: "computer:log-clear",

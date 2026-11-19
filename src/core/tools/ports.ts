@@ -54,8 +54,8 @@ export interface FileSystemPort {
  */
 export interface ComputerPort {
   grants(): Promise<{ label: string }[]>;
-  /** Asks the user to pick a folder to grant, saying why. Null when they pick none. */
-  choose(reason: string): Promise<{ label: string } | null>;
+  /** Asks the user to allow searching their computer, saying why. Null when they refuse. */
+  choose(reason: string): Promise<{ label: string; home?: boolean } | null>;
   stat(path: string): Promise<FileInfo>;
   list(path: string): Promise<DirectoryEntry[]>;
   readBytes(path: string): Promise<Uint8Array>;

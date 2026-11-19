@@ -59,6 +59,18 @@ export class ComputerGrants {
     return grant;
   }
 
+  async addHome(path: string): Promise<ComputerGrant> {
+    const real = await realpath(path).catch(() => null);
+    if (!real || !(await stat(real)).isDirectory()) throw new ToolError("The user's folder is not available.");
+    const grants = await this.list();
+    const existing = grants.find((grant) => grant.kind === "home");
+    if (existing) return existing;
+    const grant: ComputerGrant = { id: randomUUID(), label: labelFor("Usuario", grants.map((g) => g.label)), path: real, kind: "home" };
+    this.grants = [...grants, grant];
+    await this.save();
+    return grant;
+  }
+
   async remove(id: string): Promise<ComputerGrant[]> {
     this.grants = (await this.list()).filter((grant) => grant.id !== id);
     await this.save();
@@ -72,5 +84,11 @@ export class ComputerGrants {
 
 function isGrant(value: unknown): value is ComputerGrant {
   const grant = value as Partial<ComputerGrant> | null;
-  return !!grant && typeof grant.id === "string" && typeof grant.label === "string" && typeof grant.path === "string";
+  return (
+    !!grant &&
+    typeof grant.id === "string" &&
+    typeof grant.label === "string" &&
+    typeof grant.path === "string" &&
+    (grant.kind === undefined || grant.kind === "home")
+  );
 }

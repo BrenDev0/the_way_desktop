@@ -4,6 +4,8 @@ export interface ComputerGrant {
   id: string;
   label: string;
   path: string;
+  /** The user's own folder, opened as a whole to search for a file wherever it is. */
+  kind?: "home";
 }
 
 export interface ComputerActivity {
@@ -36,6 +38,18 @@ export function isSensitive(path: string): boolean {
   const name = parts[parts.length - 1] ?? "";
   return SENSITIVE_FILES.some((pattern) => pattern.test(name));
 }
+
+const HOME_NOISE = new Set(["appdata", "application data", "local settings", ".cache", ".local", ".config", ".npm", ".nvm", ".gradle", ".m2", ".cargo", ".rustup"]);
+
+/** Program and app data inside a user's folder: never what anyone means by "my file". */
+export function isHomeNoise(path: string): boolean {
+  const parts = path.replaceAll("\\", "/").split("/").filter(Boolean);
+  const first = parts[0] ?? "";
+  if (HOME_NOISE.has(first.toLowerCase()) || /^ntuser\./i.test(first)) return true;
+  return first.toLowerCase() === "library" && parts.length > 1 && parts[1].toLowerCase() !== "mobile documents";
+}
+
+export const NOISE = "That is program or app data inside the user's folder, not available to the agent.";
 
 export const PROTECTED = "That file holds credentials or keys, so it is not available to the agent.";
 

@@ -58,7 +58,13 @@ export function computerTools(computer: ComputerPort, audit?: ComputerAudit): To
     if (!reason) throw new ToolError("'reason' is required: say what you are looking for");
     const granted = await computer.choose(reason);
     if (!granted) {
-      return "The user did not pick a folder, so you have no access. Carry on without it, and do not ask again unless they ask you to.";
+      return "The user did not allow it, so you have no access. Carry on without it, and do not ask again unless they ask you to.";
+    }
+    if (granted.home) {
+      return (
+        `Read-only access granted to the user's whole folder, '${granted.label}' (Desktop, Documents, Downloads, OneDrive...). ` +
+        `Start with SearchComputer, which with no path searches everything; paths look like '${granted.label}/Documents/...'.`
+      );
     }
     return `Read-only access granted to '${granted.label}'. Use paths like '${granted.label}/...'.`;
   }

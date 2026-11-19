@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, Notification } from "electron";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { AuthService } from "../core/auth";
@@ -21,6 +21,7 @@ import { ConversationEvents } from "./conversationEvents";
 import { DockWindow } from "./dockWindow";
 import { ComputerGrants } from "./computerGrants";
 import { ComputerLog } from "./computerLog";
+import { computerPrompts } from "./computerPrompts";
 import { DocumentApi } from "./documentApi";
 import { ElectronBrowser } from "./electronBrowser";
 import { NodeComputer } from "./nodeComputer";
@@ -196,16 +197,10 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
   const computerGrants = new ComputerGrants(userData);
   const computerLog = new ComputerLog(userData);
   const documents = new DocumentApi(api);
-  const computer = new NodeComputer(computerGrants, async (reason) => {
-    const options = {
-      title: "Dar acceso de solo lectura a una carpeta",
-      message: `${reason ? `${reason}. ` : ""}AGENTIX podrá leer, nunca modificar, lo que haya en la carpeta que elijas; lo que lea se envía al servidor y al proveedor de IA.`,
-      buttonLabel: "Dar acceso",
-      properties: ["openDirectory" as const],
-    };
-    const picked = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
-    return picked.canceled ? null : picked.filePaths[0] ?? null;
-  }, (name, data) => documents.text(name, data), { system: systemSearchFor(process.platform), log: computerLog });
+  const computer = new NodeComputer(computerGrants, computerPrompts(() => mainWindow), (name, data) => documents.text(name, data), {
+    system: systemSearchFor(process.platform),
+    log: computerLog,
+  });
   const projects = new ProjectsApi(api);
 
   const runner = new ToolRunner(
