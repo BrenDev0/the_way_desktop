@@ -7,6 +7,8 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { ApiError } from "../core/api";
 import type { Downloaded, UpdaterPorts } from "../core/installUpdate";
+import { app } from "electron";
+import { replaceMacApp } from "./macUpdate";
 import { loopbackUrl } from "./serverConnectionAdapter";
 
 const DOWNLOAD_TIMEOUT = 10 * 60_000;
@@ -45,6 +47,9 @@ export class NodeUpdater implements Pick<UpdaterPorts, "download" | "discard" | 
 
   /** Detached, with nothing connected to it: it outlives this app, which quits right after. */
   launch(file: string): Promise<void> {
+    if (process.platform === "darwin") {
+      return replaceMacApp(file, { executable: process.execPath, version: app.getVersion(), pid: process.pid });
+    }
     return new Promise((resolve, reject) => {
       const child = spawn(file, [], { detached: true, stdio: "ignore" });
       child.once("error", reject);

@@ -272,7 +272,7 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     }
   });
 
-  // The person pressed ACTUALIZAR (Windows): the new installer is downloaded, started, and this app
+  // The person pressed ACTUALIZAR: the new installer is downloaded, started, and this app
   // quits for it. Once at a time. Whatever fails comes back as a message; the page stays an option.
   const updater = new NodeUpdater(join(app.getPath("temp"), "the-way-update"));
   let installing = false;
@@ -281,7 +281,7 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     installing = true;
     try {
       await installUpdate(process.platform, {
-        link: () => services.api.request<InstallerLink>("GET", "/app/installer/windows"),
+        link: (platform) => services.api.request<InstallerLink>("GET", `/app/installer/${platform}`),
         download: (url, filename) => updater.download(url, filename),
         discard: (file) => updater.discard(file),
         launch: (file) => updater.launch(file),

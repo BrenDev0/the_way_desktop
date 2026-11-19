@@ -21,6 +21,7 @@ import { ConversationEvents } from "./conversationEvents";
 import { DockWindow } from "./dockWindow";
 import { ElectronBrowser } from "./electronBrowser";
 import { registerAppHandlers, type AppServices } from "./ipc";
+import { replacedByNewerVersion } from "./macBundle";
 import { NodeFileSystem } from "./nodeFileSystem";
 import { NodeCommand } from "./nodeCommand";
 import { NodeGit } from "./nodeGit";
@@ -323,7 +324,12 @@ if (!installing) app.whenReady().then(async () => {
   registerAppHandlers(createServices(adapter), () => mainWindow);
   createWindow();
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length > 0) return;
+    void replacedByNewerVersion().then((replaced) => {
+      if (!replaced) return createWindow();
+      app.relaunch();
+      app.exit(0);
+    });
   });
 });
 

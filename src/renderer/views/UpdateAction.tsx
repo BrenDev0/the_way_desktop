@@ -3,9 +3,9 @@ import type { AppUpdate } from "../../core/update";
 import { errorText } from "./files/helpers";
 
 /**
- * What to do about a newer version. On Windows the app installs it itself: one press, one
- * confirmation (the app closes and opens again), and it downloads, installs and restarts. When that
- * fails it says why and the page is still there; elsewhere it is the page.
+ * What to do about a newer version: the app installs it itself, with one press and one
+ * confirmation (the app closes and opens again). When that fails it says why and the page is
+ * still there.
  */
 export function UpdateAction({ update, className }: { update: AppUpdate; className: string }) {
   const [phase, setPhase] = useState<"idle" | "confirm" | "installing">("idle");

@@ -32,11 +32,11 @@ describe("updateFrom", () => {
     });
   });
 
-  it("can be installed from the app on Windows only", () => {
+  it("can be installed from the app on Windows and on a Mac", () => {
     const both = { latest: { windows: "0.1.1", mac: "0.1.1" }, downloadPageUrl: "https://panel.example.com/download" };
 
     expect(updateFrom(both, "0.1.0", "win32")?.canInstall).toBe(true);
-    expect(updateFrom(both, "0.1.0", "darwin")?.canInstall).toBe(false);
+    expect(updateFrom(both, "0.1.0", "darwin")?.canInstall).toBe(true);
   });
 
   it("says nothing when this platform has no newer version, or none recorded", () => {

@@ -36,11 +36,11 @@ describe("the version line in the rail", () => {
     expect(shown).not.toContain("DESCARGAR");
   });
 
-  it("on a Mac sends the person to the download page instead", () => {
+  it("on a Mac offers the same one-press update", () => {
     const shown = html(checkFrom({ ...answer, latest: { windows: null, mac: "0.1.2" } }, "0.1.1", "darwin"));
 
-    expect(shown).toContain("DESCARGAR 0.1.2");
-    expect(shown).not.toContain("ACTUALIZAR");
+    expect(shown).toContain("ACTUALIZAR 0.1.2");
+    expect(shown).not.toContain("DESCARGAR");
   });
 
   it("does not offer a download it has no safe page for", () => {

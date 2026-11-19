@@ -37,12 +37,42 @@ describe("the app updating itself", () => {
     expect(downloads).toEqual([{ url: "https://bucket.example/signed?x=1", filename: "THE-WAY-Setup-0.1.8.exe" }]);
   });
 
-  it("is for Windows only, and asks the server for nothing elsewhere", async () => {
+  it("is for Windows and macOS only, and asks the server for nothing elsewhere", async () => {
     const { all, calls } = ports();
 
-    await expect(installUpdate("darwin", all)).rejects.toThrow(/solo está disponible en Windows/);
-    await expect(installUpdate("linux", all)).rejects.toThrow(/solo está disponible en Windows/);
+    await expect(installUpdate("linux", all)).rejects.toThrow(/solo está disponible en Windows y macOS/);
     expect(calls).toEqual([]);
+  });
+
+  it("on a Mac asks for the Mac installer, replaces the app with the zip, and only then quits", async () => {
+    const asked: string[] = [];
+    const { all, calls } = ports({
+      link: async (platform) => {
+        asked.push(platform);
+        return { url: "https://bucket.example/mac", filename: "THE-WAY-mac-0.1.8.zip", version: "0.1.8" };
+      },
+      download: async (url, filename) => ({ file: `/tmp/${filename}`, written: BIG, expected: BIG }),
+    });
+
+    await installUpdate("darwin", all);
+
+    expect(asked).toEqual(["mac"]);
+    expect(calls).toEqual(["launch /tmp/THE-WAY-mac-0.1.8.zip", "quit"]);
+  });
+
+  it("on a Mac saves it under a name of its own choosing, whatever the server says", async () => {
+    const names: string[] = [];
+    const { all } = ports({
+      link: async () => ({ url: "https://bucket.example/s", filename: "../../evil.zip", version: "0.1.8" }),
+      download: async (_url, filename) => {
+        names.push(filename);
+        return { file: `/tmp/${filename}`, written: BIG, expected: BIG };
+      },
+    });
+
+    await installUpdate("darwin", all);
+
+    expect(names).toEqual(["THE-WAY-mac.zip"]);
   });
 
   it("saves it under a name of its own choosing, whatever the server says", async () => {
