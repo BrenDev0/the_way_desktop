@@ -17,6 +17,8 @@ import { FriendlyError, friendly } from "../core/userMessages";
 import { microphoneAccess } from "./micAccess";
 import { NodeUpdater } from "./nodeUpdater";
 import { operatorMessage } from "../core/workspace/messages";
+import type { ComputerGrants } from "./computerGrants";
+import type { NodeComputer } from "./nodeComputer";
 import type { NodeFileSystem } from "./nodeFileSystem";
 import type { ProjectsApi } from "./projectsApi";
 import type { VoiceApi } from "./voiceApi";
@@ -35,6 +37,9 @@ export interface AppServices {
   api: ServerApiPort;
   /** The open folder, fenced; shared with the agent's file tools. */
   fileSystem: NodeFileSystem;
+  /** Read-only folders the user has granted beyond the open one. */
+  computer: NodeComputer;
+  computerGrants: ComputerGrants;
   localFiles: LocalFiles;
   projects: ProjectsApi;
   voice: VoiceApi;
@@ -133,6 +138,7 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
     if (state.user && (await services.workspace.claim(state.user.id))) {
       await mainWindow()?.webContents.session.clearCache();
     }
+    if (state.user) await services.computerGrants.claim(state.user.id);
     return state;
   };
 
@@ -150,6 +156,13 @@ export function registerAppHandlers(services: AppServices, mainWindow: () => Bro
   });
 
   handle(CHANNELS.tasksList, () => services.tasks.refresh());
+
+  handle(CHANNELS.computerGrants, () => services.computerGrants.list());
+  handle(CHANNELS.computerGrantAdd, async () => {
+    await services.computer.choose("");
+    return services.computerGrants.list();
+  });
+  handle(CHANNELS.computerGrantRemove, (id) => services.computerGrants.remove(requireText(id, "grant")));
 
   handle(CHANNELS.workspaceCurrent, () => services.workspace.current());
   handle(CHANNELS.workspacePlace, () => services.workspace.place());

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { AuthState } from "../core/auth";
+import type { ComputerGrant } from "../core/computer/access";
 import type { Attachment, ChatFolder, ChatMessage, Conversation } from "../core/api";
 import {
   CHANNELS,
@@ -45,6 +46,11 @@ const desktop: DesktopBridge = {
     login: (email, password) => ipcRenderer.invoke(CHANNELS.authLogin, email, password) as Promise<AuthState>,
     logout: () => ipcRenderer.invoke(CHANNELS.authLogout) as Promise<AuthState>,
     onSignedOut: (listener) => listen(CHANNELS.authSignedOut, () => listener()),
+  },
+  computer: {
+    grants: () => ipcRenderer.invoke(CHANNELS.computerGrants) as Promise<ComputerGrant[]>,
+    add: () => ipcRenderer.invoke(CHANNELS.computerGrantAdd) as Promise<ComputerGrant[]>,
+    remove: (id) => ipcRenderer.invoke(CHANNELS.computerGrantRemove, id) as Promise<ComputerGrant[]>,
   },
   workspace: {
     current: () => ipcRenderer.invoke(CHANNELS.workspaceCurrent) as Promise<string | null>,

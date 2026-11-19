@@ -36,6 +36,8 @@ export const BROWSER_TOOLS = [
 
 export const COMMAND_TOOLS = ["RunCommand"] as const;
 
+export const COMPUTER_TOOLS = ["RequestComputerAccess", "ListComputerFolder", "SearchComputer", "ReadComputerFile"] as const;
+
 export const GIT_TOOLS = [
   "GitStatus",
   "GitLog",
@@ -63,6 +65,7 @@ export const REQUIRES_APPROVAL: ReadonlySet<string> = new Set([
   "ClickBrowserElement",
   "TypeInBrowser",
   "SendWhatsappMessage",
+  "RequestComputerAccess",
 ]);
 
 export type ToolArgs = Record<string, unknown>;

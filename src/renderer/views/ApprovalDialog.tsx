@@ -7,6 +7,7 @@ interface Props {
 }
 
 const WHAT: Record<string, string> = {
+  RequestComputerAccess: "Dar acceso de solo lectura a una carpeta de este equipo",
   UpdateFile: "Modificar un archivo de este equipo",
   MovePath: "Mover o renombrar en este equipo",
   RenamePath: "Renombrar en este equipo",

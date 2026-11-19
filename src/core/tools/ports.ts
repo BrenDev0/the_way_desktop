@@ -43,6 +43,21 @@ export interface FileSystemPort {
   remove(path: string, recursive: boolean): Promise<void>;
 }
 
+/**
+ * Read-only access to the folders the user has granted, outside the open one. Every path is
+ * "<granted folder name>/<path inside it>"; the adapter owns the fence (nothing outside a
+ * grant, no symlink out, no credentials or keys) and offers no way to write.
+ */
+export interface ComputerPort {
+  grants(): Promise<{ label: string }[]>;
+  /** Asks the user to pick a folder to grant, saying why. Null when they pick none. */
+  choose(reason: string): Promise<{ label: string } | null>;
+  stat(path: string): Promise<FileInfo>;
+  list(path: string): Promise<DirectoryEntry[]>;
+  readBytes(path: string): Promise<Uint8Array>;
+  walk(path: string, enter: (name: string) => boolean, signal?: AbortSignal): AsyncIterable<WalkEntry>;
+}
+
 export interface TabInfo {
   title: string;
   url: string;

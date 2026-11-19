@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { WorkingPlace } from "../../../core/bridge";
 import type { ProjectRef, RemoteTree } from "../../../core/tools/ports";
 import { ProjectTree } from "../../../core/workspace/remoteTree";
+import { ComputerAccess } from "./ComputerAccess";
 
 interface Props {
   place: WorkingPlace;
@@ -26,7 +27,7 @@ function nameOf(path: string): string {
  */
 export function WorkPlacePicker({ place, projects, onChooseLocal, onUse, onSetRemote }: Props) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"local" | "remote">(place.mode);
+  const [tab, setTab] = useState<"local" | "remote" | "access">(place.mode);
   const [trees, setTrees] = useState<Map<string, ProjectTree>>(new Map());
   // what is opened to show its inside: projects by id, folders by "project id/folder id"
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -172,9 +173,14 @@ export function WorkPlacePicker({ place, projects, onChooseLocal, onUse, onSetRe
             <button type="button" role="tab" aria-selected={tab === "remote"} className={tab === "remote" ? "place__tab place__tab--on place__tab--remote" : "place__tab"} onClick={() => setTab("remote")}>
               ☁ REMOTO
             </button>
+            <button type="button" role="tab" aria-selected={tab === "access"} className={tab === "access" ? "place__tab place__tab--on" : "place__tab"} onClick={() => setTab("access")}>
+              ◎ LECTURA
+            </button>
           </div>
 
-          {tab === "local" ? (
+          {tab === "access" ? (
+            <ComputerAccess />
+          ) : tab === "local" ? (
             <div className="place__body">
               <p className="place__hint">Una carpeta de este equipo: AGENTIX lee, crea y modifica archivos ahí.</p>
               {place.local ? (

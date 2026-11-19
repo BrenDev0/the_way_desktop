@@ -12,6 +12,7 @@ import type { ProjectRef, RemoteTree } from "./tools/ports";
 import type { ApprovalDecision } from "./tools/runner";
 import type { DownloadResult, UploadResult } from "./tools/transfer";
 import type { UpdateCheck } from "./update";
+import type { ComputerGrant } from "./computer/access";
 import type { LocalEntry } from "./workspace/localFiles";
 
 export interface ApprovalPrompt {
@@ -87,6 +88,13 @@ export interface DesktopBridge {
     login(email: string, password: string): Promise<AuthState>;
     logout(): Promise<AuthState>;
     onSignedOut(listener: () => void): Unsubscribe;
+  };
+  /** Folders opened to the agent beyond the open one, read-only. */
+  computer: {
+    grants(): Promise<ComputerGrant[]>;
+    /** Opens the folder picker; the grants after it. */
+    add(): Promise<ComputerGrant[]>;
+    remove(id: string): Promise<ComputerGrant[]>;
   };
   workspace: {
     /** The folder the local file tools work in, or null before one is chosen. */
@@ -252,6 +260,9 @@ export const CHANNELS = {
   authLogin: "auth:login",
   authLogout: "auth:logout",
   authSignedOut: "auth:signed-out",
+  computerGrants: "computer:grants",
+  computerGrantAdd: "computer:grant-add",
+  computerGrantRemove: "computer:grant-remove",
   workspaceCurrent: "workspace:current",
   workspaceChoose: "workspace:choose",
   workspacePlace: "workspace:place",

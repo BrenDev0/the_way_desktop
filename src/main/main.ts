@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, Notification } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification } from "electron";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { AuthService } from "../core/auth";
@@ -19,7 +19,9 @@ import { ApiClient } from "./apiClient";
 import { BACKGROUND, setUpAppearance } from "./appearance";
 import { ConversationEvents } from "./conversationEvents";
 import { DockWindow } from "./dockWindow";
+import { ComputerGrants } from "./computerGrants";
 import { ElectronBrowser } from "./electronBrowser";
+import { NodeComputer } from "./nodeComputer";
 import { registerAppHandlers, type AppServices } from "./ipc";
 import { replacedByNewerVersion } from "./macBundle";
 import { NodeFileSystem } from "./nodeFileSystem";
@@ -188,6 +190,17 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
 
   // One fenced file system and one projects client, shared by the agent's tools and the files panel.
   const fileSystem = new NodeFileSystem(() => workspace.current());
+  const computerGrants = new ComputerGrants(userData);
+  const computer = new NodeComputer(computerGrants, async (reason) => {
+    const options = {
+      title: "Dar acceso de solo lectura a una carpeta",
+      message: `${reason ? `${reason}. ` : ""}AGENTIX podrá leer, nunca modificar, lo que haya en la carpeta que elijas; lo que lea se envía al servidor y al proveedor de IA.`,
+      buttonLabel: "Dar acceso",
+      properties: ["openDirectory" as const],
+    };
+    const picked = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    return picked.canceled ? null : picked.filePaths[0] ?? null;
+  });
   const projects = new ProjectsApi(api);
 
   const runner = new ToolRunner(
@@ -197,6 +210,7 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
       projects,
       git: new NodeGit(() => workspace.current()),
       command: new NodeCommand(() => workspace.current()),
+      computer,
     }),
     // one image approval covers the rest of a reply's images; background tasks keep the
     // same allowance on the server
@@ -277,6 +291,8 @@ function createServices(connection: ServerConnectionAdapter): AppServices {
     workspace,
     api,
     fileSystem,
+    computer,
+    computerGrants,
     localFiles: new LocalFiles(fileSystem),
     projects,
     voice: new VoiceApi(api),

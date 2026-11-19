@@ -6,7 +6,7 @@ import type { ApprovalDecision, ApprovalPort, ApprovalRequest } from "./runner";
  * The server's own flag (alwaysAsk) is what normally decides. Images and videos spend the
  * user's money; a deletion cannot be undone; a push leaves the machine.
  */
-const ALWAYS_ASK = new Set(["GenerateImages", "EditImage", "GenerateVideo", "AnimateImage", "EditVideo", "DeleteFile", "DeleteDir", "DeleteProjectPath", "GitPush", "RunCommand"]);
+const ALWAYS_ASK = new Set(["GenerateImages", "EditImage", "GenerateVideo", "AnimateImage", "EditVideo", "DeleteFile", "DeleteDir", "DeleteProjectPath", "GitPush", "RunCommand", "RequestComputerAccess"]);
 
 export function mustAsk(call: PendingToolCall): boolean {
   return call.alwaysAsk === true || ALWAYS_ASK.has(call.name);
